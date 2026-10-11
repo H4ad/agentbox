@@ -1,0 +1,6 @@
+Feature: every label chip on a pull request (in the list, desktop/src/renderer/components/PullRequestsPanel.tsx, and in the modal, PullRequestModal.tsx) gets a small X button that appears on hover or keyboard focus and removes the label.
+- It uses the same optimistic path as the label picker: the label goes at once, and on error it comes back with a toast.
+- The button is a tab stop with aria-label "Remove label <name>" (new i18n key `memory.pulls.labels.remove`, text "Remove label {name}" in en-US and "Remover etiqueta {name}" in pt-BR), and clicking it must not open the modal.
+- The modal's chips apply pending edits too, and a successful edit updates the cached detail, so the removed label doesn't reappear there.
+- Add and export a pure helper `labelToggle(id: number, number: number, label: Label, on: boolean): LabelEdit` in desktop/src/renderer/lib/pulls.ts, returning the edit for putting a label on (`add: [label], remove: []`) or taking it off (`add: [], remove: [label.name]`); use it from the picker and the X, and add a test for it in pulls.test.ts.
+Check with `npm --prefix desktop run typecheck`, `npm --prefix desktop run lint` and `cd desktop && node --test src/renderer/lib/pulls.test.ts`. Do not push.

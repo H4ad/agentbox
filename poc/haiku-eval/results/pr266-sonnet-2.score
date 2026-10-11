@@ -1,0 +1,6 @@
+i18n=pass
+ 6 files changed, 74 insertions(+), 16 deletions(-)
+typecheck=pass
+lint=pass
+tests=pass
+ok=1

@@ -1,0 +1,4 @@
+ 4 files changed, 414 insertions(+), 14 deletions(-)
+vet=fail
+tests=fail
+ok=0

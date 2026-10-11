@@ -1,0 +1,4 @@
+ 1 file changed, 159 insertions(+)
+vet=pass
+tests=fail
+ok=0
