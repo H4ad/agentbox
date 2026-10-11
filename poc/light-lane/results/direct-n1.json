@@ -1,0 +1,139 @@
+{
+  "arm": "direct",
+  "n": 1,
+  "model": "claude-opus-5-5",
+  "task": "In internal/daemon/pressure.go, what is pressureInterval set to, and what reads it? Answer in two sentences; don't change any file.",
+  "memMax": "1536M",
+  "results": [
+    {
+      "arm": "direct",
+      "n": 1,
+      "rep": 0,
+      "runs": [
+        {
+          "id": "direct-1791702269401-0",
+          "worktreeMs": 76,
+          "ok": true,
+          "initializeMs": 319,
+          "readyMs": 792,
+          "firstToolMs": 2523,
+          "firstTool": "Terminal",
+          "firstTextMs": 11126,
+          "answer": "`pressureInterval` is `2 * time.Second` (`internal/daemon/pressure.go:36`): how often the daemon reads the VM's memory pressure and checks the agents' memory limits and kills. Only `internal/daemon/se",
+          "doneMs": 11137,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 245,
+          "steadyMiB": 192,
+          "steadyAnonMiB": 164,
+          "peakMiB": 260
+        }
+      ],
+      "totalPeakMiB": 346,
+      "wallMs": 16870
+    },
+    {
+      "arm": "direct",
+      "n": 1,
+      "rep": 1,
+      "runs": [
+        {
+          "id": "direct-1791702286272-0",
+          "worktreeMs": 62,
+          "ok": true,
+          "initializeMs": 295,
+          "readyMs": 857,
+          "firstToolMs": 1715,
+          "firstTool": "Terminal",
+          "firstTextMs": 6255,
+          "answer": "`pressureInterval` is `2 * time.Second` (`internal/daemon/pressure.go:37`): it sets how often the VM's memory pressure is read and the agents' memory limits and kills are checked. Only the server cons",
+          "doneMs": 6277,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 246,
+          "steadyMiB": 223,
+          "steadyAnonMiB": 161,
+          "peakMiB": 309
+        }
+      ],
+      "totalPeakMiB": 334,
+      "wallMs": 12000
+    },
+    {
+      "arm": "direct",
+      "n": 1,
+      "rep": 2,
+      "runs": [
+        {
+          "id": "direct-1791702298272-0",
+          "worktreeMs": 59,
+          "ok": true,
+          "initializeMs": 254,
+          "readyMs": 775,
+          "firstToolMs": 1720,
+          "firstTool": "Terminal",
+          "firstTextMs": 8156,
+          "answer": "`pressureInterval` is `2 * time.Second` (`internal/daemon/pressure.go:37`), which is how often the daemon reads the VM's memory pressure and checks the agents' memory limits and kills. Nothing reads t",
+          "doneMs": 8172,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 193,
+          "steadyMiB": 171,
+          "steadyAnonMiB": 166,
+          "peakMiB": 255
+        }
+      ],
+      "totalPeakMiB": 317,
+      "wallMs": 13896
+    },
+    {
+      "arm": "direct",
+      "n": 1,
+      "rep": 3,
+      "runs": [
+        {
+          "id": "direct-1791702312168-0",
+          "worktreeMs": 59,
+          "ok": true,
+          "initializeMs": 250,
+          "readyMs": 848,
+          "firstToolMs": 1646,
+          "firstTool": "Terminal",
+          "firstTextMs": 7587,
+          "answer": "`pressureInterval` is `2 * time.Second` (`internal/daemon/pressure.go:37`), which is how often the daemon reads the VM's memory pressure and checks the agents' memory limits and kills. Nothing reads t",
+          "doneMs": 7602,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 197,
+          "steadyMiB": 179,
+          "steadyAnonMiB": 167,
+          "peakMiB": 259
+        }
+      ],
+      "totalPeakMiB": 331,
+      "wallMs": 13329
+    },
+    {
+      "arm": "direct",
+      "n": 1,
+      "rep": 4,
+      "runs": [
+        {
+          "id": "direct-1791702325497-0",
+          "worktreeMs": 67,
+          "ok": true,
+          "initializeMs": 298,
+          "readyMs": 691,
+          "firstToolMs": 1382,
+          "firstTool": "Terminal",
+          "firstTextMs": 7522,
+          "answer": "`pressureInterval` is `2 * time.Second` (`internal/daemon/pressure.go:37`), which is how often the daemon reads the VM's memory pressure and checks the agents' memory limits and kills. Nothing reads i",
+          "doneMs": 7533,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 231,
+          "steadyMiB": 191,
+          "steadyAnonMiB": 177,
+          "peakMiB": 263
+        }
+      ],
+      "totalPeakMiB": 344,
+      "wallMs": 13256
+    }
+  ]
+}

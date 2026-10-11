@@ -1,0 +1,35 @@
+{
+  "arm": "bwrap",
+  "n": 1,
+  "model": "claude-opus-5-5",
+  "task": "In README.md, fix nothing else: append one line at the very end saying \"Light lane test edit.\" Then commit it with git (message \"docs: light lane test edit\") and show `git log --oneline -1`. Do not push.",
+  "memMax": "1536M",
+  "results": [
+    {
+      "arm": "bwrap",
+      "n": 1,
+      "rep": 0,
+      "runs": [
+        {
+          "id": "bwrap-1791702178313-0",
+          "worktreeMs": 62,
+          "ok": true,
+          "initializeMs": 277,
+          "readyMs": 665,
+          "firstToolMs": 1471,
+          "firstTool": "Terminal",
+          "firstTextMs": 5447,
+          "answer": "I added \"Light lane test edit.\" as the last line of `README.md` and committed it. Nothing else in the file changed. I didn't push.\n\n```\n38379f76 docs: light lane test edit\n```",
+          "doneMs": 5462,
+          "stopReason": "end_turn",
+          "turnPeakMiB": 257,
+          "steadyMiB": 178,
+          "steadyAnonMiB": 167,
+          "peakMiB": 262
+        }
+      ],
+      "totalPeakMiB": 383,
+      "wallMs": 11192
+    }
+  ]
+}
