@@ -184,7 +184,7 @@ func (s *Server) artifactOf(r *http.Request) (string, api.Artifact, state.Connec
 }
 
 // hatchPage is what get_page answers with: the page's details, and since
-// leciric/hatch#3 a short-lived link to its HTML.
+// lintingdotdev/hatch#3 a short-lived link to its HTML.
 type hatchPage struct {
 	Artifact struct {
 		Title          string  `json:"title"`

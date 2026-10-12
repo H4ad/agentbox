@@ -21,7 +21,7 @@ type fakeHatch struct {
 	*httptest.Server
 	mu sync.Mutex
 	// contentURL is whether get_page answers with content_url, as Hatch does
-	// since leciric/hatch#3.
+	// since lintingdotdev/hatch#3.
 	contentURL bool
 	seen       []string // the Authorization of each MCP request
 	gone       map[string]bool

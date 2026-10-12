@@ -156,7 +156,7 @@ before and after in your pull request.
 ## The hub
 
 The hub, the server half behind remote environments, is a separate program in a **private**
-repository, [leciric/agentbox-hub](https://github.com/leciric/agentbox-hub). Everything that
+repository, [lintingdotdev/agentbox-hub](https://github.com/lintingdotdev/agentbox-hub). Everything that
 connects to a hub is here.
 
 The protocol between the two, [`hubapi/`](hubapi/), is shared: the hub keeps a byte-identical copy.

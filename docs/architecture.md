@@ -203,7 +203,7 @@ erDiagram
 ## The hub, from this side
 
 A hub is the optional server half of AgentBox; it's a separate, closed-source program
-([leciric/agentbox-hub](https://github.com/leciric/agentbox-hub)). This repository only carries
+([lintingdotdev/agentbox-hub](https://github.com/lintingdotdev/agentbox-hub)). This repository only carries
 its side of the protocol, in [`hubapi/`](../hubapi):
 
 - `hubapi.go` defines the token prefixes (`abx_s_` for a session, `abx_e_` for an environment),

@@ -171,7 +171,7 @@ there, against fakes. **Nesting** gives an agent a real Incus of its own:
 
 ## The hub is in another repository
 
-The hub, the server half, is the private [leciric/agentbox-hub](https://github.com/leciric/agentbox-hub)
+The hub, the server half, is the private [lintingdotdev/agentbox-hub](https://github.com/lintingdotdev/agentbox-hub)
 (D44). The two share [`hubapi/`](hubapi/), the protocol, of which the hub keeps a byte-identical
 copy: when you change `hubapi/`, copy it to the hub (its README says how). `hubapi/` must never
 import `internal/` or the rest of this module, and `internal/` must never import the hub.

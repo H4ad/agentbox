@@ -63,7 +63,7 @@ type ArtifactPreview struct {
 	// Status is ArtifactActive, ArtifactExpired or ArtifactUnavailable.
 	Status string `json:"status"`
 	// Page is whether .../page serves its HTML. Hatch hands it over
-	// (get_page's content_url) only since leciric/hatch#3; before, and when
+	// (get_page's content_url) only since lintingdotdev/hatch#3; before, and when
 	// Hatch can't be reached, the app offers the link instead.
 	Page bool `json:"page"`
 	// Error is why Status is ArtifactUnavailable, or why Page is false.
