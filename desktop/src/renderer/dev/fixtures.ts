@@ -11,6 +11,7 @@ import type { FreeRun } from '../components/ResourceControls';
 import { freeTargets } from '../lib/freeResources';
 import { inScope, type MediaScope } from '../lib/mediaPages';
 import { pagePageUrl, pageRequest, pageThumbUrl } from './pages';
+import { pastRequest } from './pastAgents';
 
 export const PROJECT = 'agentbox';
 
@@ -1652,6 +1653,8 @@ export function installDevBridge(): void {
       if (method === 'PATCH' && path === '/v1/settings') return patchDefaults(body as T.UpdateSettingsRequest);
       const page = pageRequest(method, path);
       if (page) return page;
+      const past = pastRequest(method, path, body);
+      if (past) return past;
       for (const answer of devRequests) {
         const res = answer(method, path);
         if (res) return res;

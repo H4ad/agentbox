@@ -1008,6 +1008,20 @@
     "height": 900
   },
   {
+    "id": "past-agents-dark",
+    "description": "Every project's past agents: PR badges, a long title and branch, tokens, the filters — dark",
+    "query": "past=list&theme=dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "id": "past-agent-chat-dark",
+    "description": "A past agent's read-only chat, with Continue and Delete in the composer's place — dark",
+    "query": "past=chat&theme=dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
     "id": "chat-rich-dark",
     "description": "A project chat's answer with a mermaid diagram and chart, an SVG, a framed page and an html block left as code — dark",
     "query": "chat=rich&theme=dark",
