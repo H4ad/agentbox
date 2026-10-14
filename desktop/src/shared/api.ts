@@ -2391,6 +2391,16 @@ export interface ArtifactPreview {
   error?: string;
 }
 
+export interface PublishRenderRequest {
+  title: string;
+  html: string;
+}
+
+export interface PublishRenderResult {
+  item: ChatItem;
+  url: string;
+}
+
 export const JobRunning = "running";
 export const JobSucceeded = "succeeded";
 export const JobFailed = "failed";
