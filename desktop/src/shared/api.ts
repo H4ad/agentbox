@@ -192,6 +192,8 @@ export interface Agent {
   chat?: string;
   stalledSince?: string;
   background?: string[];
+  outcome?: string;
+  outcomeNote?: string;
   state: string;
   memory?: MemoryHold;
   ip: string;
@@ -1370,6 +1372,8 @@ export interface FleetAgent {
   chat?: string;
   stalledSince?: string;
   background?: string[];
+  outcome?: string;
+  outcomeNote?: string;
   state: string;
   memory?: MemoryHold;
   ip: string;
@@ -1474,6 +1478,7 @@ export interface AgentEvent {
   cut?: boolean;
   changes?: AgentChanges;
   pr?: PullRequest;
+  outcome?: string;
   question?: string;
   at: string;
 }
