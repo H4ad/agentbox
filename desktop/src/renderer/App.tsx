@@ -36,6 +36,7 @@ import { WSLSetup } from "./components/WSLSetup";
 import { Notice } from "./components/ui/card";
 import { api } from "./lib/api";
 import { t as tNow, useT } from "./lib/i18n";
+import { useReadyAlerts } from "./lib/useReadyAlerts";
 import { resetChatEvents } from "./lib/chat";
 import { onNotification, useConnection } from "./lib/events";
 import type { AgentPlaceName, ProjectPlaceName } from "./lib/tabs";
@@ -288,6 +289,34 @@ export function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agents.data]);
+
+  // Tell you when an agent newly lands in Ready to review: the chime and the
+  // "new" marks are the hook's (lib/useReadyAlerts.ts); the OS notification,
+  // shown only while the window isn't in front, is here.
+  useReadyAlerts((items) => {
+    const first = items[0];
+    const id = `ready:${first.ref}:${Date.now()}`;
+    waiting.current.set(id, () => {
+      waiting.current.delete(id);
+      select({ kind: "agent", ref: first.ref, tab: "chat" });
+    });
+    const projects = queryClient.getQueryData<T.Project[]>(["projects"]);
+    void window.agentbox
+      .notify({
+        id,
+        title: tNow("review.notice.title"),
+        body:
+          items.length === 1
+            ? tNow("review.notice.one", {
+                agent: first.title || first.agent,
+                project: projectLabel(first.project, projects),
+              })
+            : tNow("review.notice.many", { count: items.length }),
+      })
+      .then((shown) => {
+        if (!shown) waiting.current.delete(id);
+      });
+  });
 
   const viewKey =
     view.kind === "agent"
