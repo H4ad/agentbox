@@ -157,11 +157,17 @@
 //                           bridge answers, the agent coming back in 6s
 //                           (dev/review.tsx)
 //   &panel=files            with &v2=1, the right-hand panel open on a tab
-//                           (files, desktop, terminal, browser, pages, media);
-//                           &whose=agent-12 (or lead, or past:agent-80) shows
-//                           that agent's beside the chat, &file=README.md with
-//                           a file open in Files, &section=general Settings
-//                           on that section
+//                           (files, desktop, terminal, browser, pages, media,
+//                           pulls, settings), or on its launcher (launcher);
+//                           several, comma-separated, each kind:whose
+//                           (files:lead,desktop:agent-41,media:past:agent-80),
+//                           the last shown (the first with &first=1); a tab
+//                           with no whose asks for it (&whose= gives every tab
+//                           one), &add=1 adds a new tab's launcher,
+//                           &file=README.md opens a file in Files,
+//                           &section=general Settings on that section;
+//                           &destroy=4000 makes destroying an agent take 4s
+//                           and succeed
 //   ?newagent=1             the New agent dialog, open on the project, for its
 //                           Size picker and the rest of its form
 //   &free=progress|done|partial|error
@@ -232,10 +238,10 @@ import { HomeChatPanel } from '../components/HomeChatPanel';
 import { leadAgentFrom } from '../components/ProjectChatPanel';
 import { api } from '../lib/api';
 import type { AgentPlaceName, ProjectPlaceName } from '../lib/tabs';
-import { agent12Chat, asleepChat, buildFixtures, claudeLimits, compactionThread, richChat, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedNightly, seedMeterUsage, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, setNotifications } from './fixtures';
+import { agent12Chat, asleepChat, buildFixtures, claudeLimits, dropDevAgent, compactionThread, richChat, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedNightly, seedMeterUsage, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, setNotifications } from './fixtures';
 import { publishOne, seedPages } from './pages';
 import { seedPastAgents } from './pastAgents';
-import { openPanelOn, setPanel, type PanelTab } from '../lib/rightPanel';
+import { activateTab, addTab, chatPanel, openPanelOn, panelState, setPanel, setPanelOpen, type PanelKind } from '../lib/rightPanel';
 import type { ProjectSection } from '../lib/tabs';
 import { openFile } from '../lib/files';
 import { PastAgents } from '../components/PastAgents';
@@ -415,17 +421,61 @@ if (appView && params.get('v2') === '1') {
   // its picker the past agents.
   if (!media) seedMedia(queryClient);
   if (!past) seedPastAgents(queryClient);
-  const tab = params.get('panel') as PanelTab | null;
-  if (tab) {
+  // Each page starts with no panel open, whatever the last one left.
+  setPanel({ chats: {} });
+  const tabs = params.get('panel');
+  if (tabs) {
     const chat = appView.startsWith('agent-') ? `${PROJECT}/${appView}` : `${PROJECT}/lead`;
-    const whose = params.get('whose');
-    const ref = whose?.startsWith('past:') ? `past:${PROJECT}/${whose.slice(5)}` : whose ? `${PROJECT}/${whose}` : undefined;
-    openPanelOn(chat, tab, ref);
+    const refOf = (whose: string | undefined) => (whose === 'lead' ? `${PROJECT}/lead` : whose?.startsWith('past:') ? `past:${PROJECT}/${whose.slice(5)}` : whose ? `${PROJECT}/${whose}` : undefined);
     const section = params.get('section') as ProjectSection | null;
     if (section) setPanel({ section });
-    const file = params.get('file');
-    if (file) openFile(ref ?? chat, file);
+    let first: string | undefined;
+    for (const item of tabs.split(',')) {
+      const [kind, whose] = item.split(':') as [PanelKind | 'launcher', string | undefined];
+      if (kind === 'launcher') {
+        setPanelOpen(chat, true);
+        continue;
+      }
+      const ref = refOf(whose ?? params.get('whose') ?? undefined);
+      openPanelOn(chat, kind, ref);
+      first ??= chatPanel(panelState(), chat).active ?? undefined;
+      const file = params.get('file');
+      if (file && kind === 'files' && ref) openFile(ref, file);
+    }
+    if (params.get('add') === '1') addTab(chat);
+    else if (params.get('first') === '1' && first) activateTab(chat, first);
   }
+}
+// A refetch of a lead's chat or of the skills gets what was seeded, not the
+// bridge's {} for what it doesn't know: the v2 sidebar refetches leads every
+// minute, and a lead with no ref took the page down.
+if (appView) {
+  type Bridge = { request: (method: string, path: string, body?: unknown) => Promise<unknown> };
+  const bridge = (window as unknown as { agentbox: Bridge }).agentbox;
+  const inner = bridge.request;
+  bridge.request = async (method, path, body) => {
+    const lead = method === 'GET' && /^\/v1\/projects\/([^/]+)\/lead$/.exec(path);
+    const seeded = lead && queryClient.getQueryData(['projectChat', decodeURIComponent(lead[1])]);
+    if (seeded) return { status: 200, body: JSON.stringify(seeded), contentType: 'application/json' };
+    const answer = (await inner(method, path, body)) as { status: number; body: string };
+    if (method === 'GET' && /\/skills(\?|$)/.test(path) && answer.body === '{}') return { ...answer, body: '[]' };
+    return answer;
+  };
+}
+// &destroy=4000: destroying an agent takes that long, then succeeds (the
+// v2 sidebar's "removing…"), and its row goes from the fixtures.
+const destroyMs = Number(params.get('destroy') ?? 0);
+if (destroyMs > 0) {
+  type Bridge = { request: (method: string, path: string, body?: unknown) => Promise<unknown> };
+  const bridge = (window as unknown as { agentbox: Bridge }).agentbox;
+  const inner = bridge.request;
+  bridge.request = async (method, path, body) => {
+    const gone = method === 'DELETE' && /^\/v1\/agents\/[^/]+\/[^/?]+\?/.exec(path);
+    if (!gone) return inner(method, path, body);
+    await new Promise((resolve) => setTimeout(resolve, destroyMs));
+    dropDevAgent(path.split('?')[0].split('/').slice(3).map(decodeURIComponent).join('/'));
+    return { status: 204, body: '', contentType: 'application/json' };
+  };
 }
 if (imageUpdate) seedImageUpdate(queryClient);
 // v2 draws Overview, Media and Past agents inside Settings.
