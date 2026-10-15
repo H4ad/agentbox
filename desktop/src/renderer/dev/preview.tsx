@@ -241,6 +241,7 @@ const topbar = params.get('topbar');
 const pulls = params.get('pulls') === '1';
 const home = params.get('home') === '1';
 const review = params.get('review'); // "Ready to review" (dev/review.tsx)
+const concept = params.get('concept'); // a navigation concept (dev/concepts)
 const notify = params.get('notify'); // 'bell' | 'media' | 'viewer' | 'toast' | null
 const media = params.get('media'); // 'project' the project's Media, 'agent' agent-99's Media tab
 const tokens = params.get('tokens'); // '1' the project's Tokens tab, 'agent' agent-99's own tokens card
@@ -587,7 +588,10 @@ function PagePreview({ at }: { at: string }) {
   );
 }
 
+const Concepts = lazy(() => import('./concepts').then((m) => ({ default: m.Concepts })));
+
 function Preview() {
+  if (concept) return <Suspense fallback={null}><Concepts which={concept} menu={params.get('menu') === '1'} /></Suspense>;
   if (github) return <GitHubPreview />;
   if (page) return <PagePreview at={page} />;
   if (usage) return <UsagePreview />;
