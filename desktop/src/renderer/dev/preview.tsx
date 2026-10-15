@@ -156,7 +156,7 @@
 //                           (dev/review.tsx), for its modal and the PR's
 //   &pins=a,b               with &v2=1, those projects pinned, in that order
 //   &v2=1                   with ?app=, UI v2, the lead-first layout (Settings →
-//                           General → Experimental): leads with their last lines
+//                           Experimental): leads with their last lines
 //                           and agents folded under them, filters, and the
 //                           review's Merge and Request changes, which the dev
 //                           bridge answers, the agent coming back in 6s
@@ -290,7 +290,7 @@ const power = params.get('power');
 const free = params.get('free');
 const newAgent = params.get('newagent') === '1';
 const past = params.get('past'); // 'list' every project's past agents, 'chat' one read in its chat
-const appView = params.get('app'); // 'home' | 'project' | 'settings' | an agent's name
+const appView = params.get('app'); // 'home' | 'homeChat' | 'project' | 'settings' | an agent's name
 const loading = params.get('loading'); // 'hold' | 'refetch' | milliseconds | null
 const io = params.get('io'); // "1" | "stalling" | "agent" | null
 const imageUpdate = params.get('setup') === 'updating';
@@ -485,8 +485,9 @@ if (destroyMs > 0) {
   };
 }
 if (imageUpdate) seedImageUpdate(queryClient);
-// v2 draws Overview, Media and Past agents inside Settings.
-if (settingsPage || appView === 'settings' || (params.get('v2') === '1' && (appView === 'home' || appView === 'media'))) seedSettings(queryClient);
+// The whole app can open Settings from its sidebar, which needs Setup's
+// checks: the bare { ready: true } the lists answer with has none.
+if (settingsPage || appView) seedSettings(queryClient);
 if (params.get('drag')) dragBridge(queryClient, params.get('drag') === 'slow' ? 1_500 : 300);
 if (params.get('enforce') === '1') { seedDefaults(queryClient); queryClient.setQueryData<T.Settings>(['settings'], (s) => s && { ...s, enforceAgentDefaults: true }); }
 if (params.get('nightly') === '1') seedNightly(queryClient);
@@ -534,7 +535,7 @@ if (meters) {
   }
 }
 
-if (settingsPage) settingsBridge();
+if (settingsPage || appView) settingsBridge();
 if (page) pageBridge();
 if (power) seedPower(queryClient, power, { tight: params.get('mem') === 'tight', near: params.get('claude') === 'near' });
 if (power) seedMeterUsage(queryClient);
@@ -1015,7 +1016,8 @@ function GitHubPreview() {
 }
 
 // settingsBridge answers what Settings polls and the dev bridge would answer
-// with a bare {}: the phone's LAN status, off and unpaired.
+// with a bare {}: the phone's LAN status, off and unpaired, and the lists of
+// skills, connectors and memories, empty.
 function settingsBridge(): void {
   type Bridge = { request: (method: string, path: string, body?: unknown) => Promise<unknown> };
   const bridge = (window as unknown as { agentbox: Bridge }).agentbox;
@@ -1045,8 +1047,12 @@ function settingsBridge(): void {
     lan = { ...lan, enabled: true, listening: true, tunnel: { ...lan.tunnel, enabled: true, state: 'running', hub, namedHostname: 'chat.example.com' } };
     lan = withMode(hub ? 'hub' : 'quick');
   }
+  // The lists Skills, Connectors, Memory and a project's accounts and
+  // credentials read, empty.
+  const lists = /^\/v1\/(skills|connectors|global\/memory\/memories|limits)(\?|$)|^\/v1\/projects\/[^/]+\/(skills|connectors|credentials)(\?|$)/;
   bridge.request = async (method, path, body) => {
     if (method === 'GET' && path === '/v1/lan') return answer(lan);
+    if (method === 'GET' && lists.test(path)) return answer([]);
     if (phone && method === 'PATCH' && path === '/v1/lan') {
       const req = (typeof body === 'string' ? JSON.parse(body) : body) as T.UpdateLANRequest;
       if (req.tunnelMode) lan = withMode(req.tunnelMode);
@@ -1243,6 +1249,7 @@ if (phoneMode === 'frame') {
   const initial: View =
     appView === 'home' ? { kind: 'home' }
     : appView === 'settings' ? { kind: 'settings' }
+    : appView === 'homeChat' ? { kind: 'homeChat' }
     : appView === 'project' || appView === 'pulls' ? { kind: 'project', project: PROJECT, tab: appView === 'pulls' ? 'pulls' : 'chat' }
     : { kind: 'agent', ref: `${PROJECT}/${appView}` };
   createRoot(document.getElementById('root')!).render(

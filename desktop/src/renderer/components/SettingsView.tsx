@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Archive,
+  Bell,
   ArrowLeft,
-  House,
-  Images,
+  FlaskConical,
   Languages,
   ArrowRight,
   Bot,
@@ -83,6 +82,7 @@ import { GlobalMemoryPanel } from "./GlobalMemoryPanel";
 import { phoneGroups } from "./PhoneSettings";
 import { SettingsPage, keepScroll, openSettingsSection, type SectionIcons } from "./SettingsPage";
 import { SettingNote, SettingRow } from "./ui/settings";
+import { EnvironmentSwitcher } from "./EnvironmentSwitcher";
 import { Input, Label } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { DoNotDisturbSetting, ChimeVolume, NotificationKinds, NotificationModeChoice } from "./NotificationSettings";
@@ -202,20 +202,11 @@ function githubDetail(auth?: T.AuthStatus): string | undefined {
     : t("settings.setup.githubOwn");
 }
 
-// pages are v2's Overview, Media and Past agents, sections of Settings next
-// to General there; section opens one (or any section), and onSection hears
-// which the user picks (SettingsPage).
 export function SettingsView({
   onHome,
-  pages,
-  section,
-  onSection,
   linked,
 }: {
   onHome?: () => void;
-  pages?: SettingSection[];
-  section?: string;
-  onSection?: (id: string) => void;
   // linked is the section a link elsewhere in the app opened Settings at
   // (openSettingsSection).
   linked?: string;
@@ -513,13 +504,10 @@ export function SettingsView({
     loaded &&
     (hostSetup.data?.linux?.mode === "host" ||
       steps.every((s) => s.optional || usable(s.status)));
-  // One of v2's pages asked for is a page, not a step: it opens past the
-  // wizard, as does a link from elsewhere in the app to another section (the
-  // composer's Log in opens Accounts). A link to Setup is the wizard's while
-  // there's setting up to do: it opens at the next step either way.
-  const asked =
-    (!!section && !!pages?.some((p) => p.id === section)) ||
-    (linked !== undefined && linked !== "setup");
+  // A link from elsewhere in the app to another section (the composer's Log in
+  // opens Accounts) opens past the wizard. A link to Setup is the wizard's
+  // while there's setting up to do: it opens at the next step either way.
+  const asked = linked !== undefined && linked !== "setup";
   useEffect(() => {
     if (page === null && loaded) setPage(settled || asked ? "tabs" : "wizard");
   }, [page, loaded, settled, asked]);
@@ -554,9 +542,6 @@ export function SettingsView({
       hostSetupRan={hostSetupRan}
       agentbox={cli.data?.path ? "agentbox" : (cli.data?.binary ?? "agentbox")}
       onWizard={() => setPage("wizard")}
-      pages={pages}
-      section={section}
-      onSection={onSection}
     />
   );
 }
@@ -823,10 +808,12 @@ function Finished({
 // setting's place is decided, and the words a search finds it by.
 //
 // The installation's sections go from what you change most to what you set
-// once: how it looks, what agents run on, what they do, what they may take,
-// the logins they use, and what this machine needs. Each project's settings
-// follow them, as a section per project. Settings that most people never
-// change are marked advanced, and folded at the end of their section.
+// once, under three headings: the app itself (how it looks, what notifies
+// you, the phone), AI and agents (the logins, the models, what agents do and
+// what they can use), and this computer (what agents may take of it, what it
+// needs, what's still experimental). Each project's settings follow them, as
+// a section per project. Each section leads with the few settings people
+// change; the rest are marked advanced, and folded at the end of it.
 function InstalledSettings({
   steps,
   error,
@@ -835,13 +822,7 @@ function InstalledSettings({
   hostSetupRan,
   agentbox,
   onWizard,
-  pages,
-  section,
-  onSection,
 }: {
-  pages?: SettingSection[];
-  section?: string;
-  onSection?: (id: string) => void;
   steps: Step[];
   error?: string;
   info?: { version: string; electron: string; socket: string };
@@ -966,13 +947,24 @@ function InstalledSettings({
               modified: changed((s) => s.language !== T.DefaultLanguage),
               render: () => <LanguageSetting />,
             },
-            {
-              id: "topbar-detailed",
-              label: t("settings.entry.topbar-detailed.label"),
-              keywords: t("settings.entry.topbar-detailed.keywords"),
-              modified: topBarDetailed,
-              render: () => <TopBarDetailedSetting />,
-            },
+            // v2's sidebar keeps only Settings and Past agents at its foot, so
+            // which AgentBox this window drives is chosen here.
+            ...(uiV2
+              ? [
+                  {
+                    id: "environment",
+                    label: t("settings.entry.environment.label"),
+                    keywords: t("settings.entry.environment.keywords"),
+                    render: () => <EnvironmentSetting />,
+                  },
+                ]
+              : []),
+          ],
+        },
+        {
+          id: "working",
+          title: t("settings.group.working.title"),
+          entries: [
             {
               id: "reviewing",
               label: t("settings.entry.reviewing.label"),
@@ -980,12 +972,21 @@ function InstalledSettings({
               modified: !reviewing,
               render: () => <ReviewingSetting />,
             },
+            {
+              id: "topbar-detailed",
+              label: t("settings.entry.topbar-detailed.label"),
+              keywords: t("settings.entry.topbar-detailed.keywords"),
+              advanced: true,
+              modified: topBarDetailed,
+              render: () => <TopBarDetailedSetting />,
+            },
             ...(hatchConnected
               ? [
                   {
                     id: "pages-stack",
                     label: t("settings.entry.pages-stack.label"),
                     keywords: t("settings.entry.pages-stack.keywords"),
+                    advanced: true,
                     modified: pageStack !== "new",
                     render: () => <PagesStackSetting />,
                   },
@@ -994,18 +995,75 @@ function InstalledSettings({
           ],
         },
         {
-          id: "experimental",
-          title: t("settings.group.experimental.title"),
+          id: "updates",
+          title: t("settings.group.updates.title"),
           entries: [
             {
-              id: "ui-v2",
-              label: t("settings.entry.ui-v2.label"),
-              keywords: t("settings.entry.ui-v2.keywords"),
-              modified: uiV2,
-              render: () => <UiV2Setting />,
+              id: "update-channel",
+              label: t("settings.entry.update-channel.label"),
+              keywords: t("settings.entry.update-channel.keywords"),
+              modified: update.data ? update.data.channel !== (update.data.nightly ? "nightly" : "stable") : undefined,
+              render: () => <UpdateChannel />,
+            },
+            ...(info
+              ? [
+                  {
+                    id: "whats-new",
+                    label: t("settings.entry.whats-new.label"),
+                    keywords: t("settings.entry.whats-new.keywords"),
+                    render: () => <WhatsNewRow version={info.version} />,
+                  },
+                ]
+              : []),
+            {
+              id: "report-problem",
+              label: t("settings.entry.report-problem.label"),
+              keywords: t("settings.entry.report-problem.keywords"),
+              render: () => <ReportProblemRow />,
+            },
+            {
+              id: "update-check",
+              label: t("settings.entry.update-check.label"),
+              keywords: t("settings.entry.update-check.keywords"),
+              advanced: true,
+              modified: changed((s) => !s.updateCheck),
+              render: () => <UpdateCheck />,
             },
           ],
         },
+        {
+          id: "privacy",
+          title: t("settings.group.privacy.title"),
+          entries: [
+            {
+              id: "usage-stats",
+              label: t("settings.entry.usage-stats.label"),
+              keywords: t("settings.entry.usage-stats.keywords"),
+              modified: changed((s) => !s.usageStats),
+              render: () => <UsageStats />,
+            },
+            {
+              id: "error-reports",
+              label: t("settings.entry.error-reports.label"),
+              keywords: t("settings.entry.error-reports.keywords"),
+              modified: changed((s) => !s.errorReports),
+              render: () => <ErrorReportsSetting />,
+            },
+          ],
+        },
+      ],
+      footer: info && (
+        <p className="text-center font-mono text-[11px] text-faint">
+          AgentBox {isNightly(info.version) ? `Nightly ${info.version}` : info.version} · Electron {info.electron} · {info.socket}
+        </p>
+      ),
+    },
+    {
+      id: "notifications",
+      title: t("settings.section.notifications.title"),
+      description: t("settings.section.notifications.description"),
+      scope: "installation",
+      groups: [
         {
           id: "notifications",
           title: t("settings.group.notifications.title"),
@@ -1032,68 +1090,7 @@ function InstalledSettings({
             },
           ],
         },
-        {
-          id: "updates",
-          title: t("settings.group.updates.title"),
-          entries: [
-            {
-              id: "update-check",
-              label: t("settings.entry.update-check.label"),
-              keywords: t("settings.entry.update-check.keywords"),
-              modified: changed((s) => !s.updateCheck),
-              render: () => <UpdateCheck />,
-            },
-            {
-              id: "update-channel",
-              label: t("settings.entry.update-channel.label"),
-              keywords: t("settings.entry.update-channel.keywords"),
-              modified: update.data ? update.data.channel !== (update.data.nightly ? "nightly" : "stable") : undefined,
-              render: () => <UpdateChannel />,
-            },
-            {
-              id: "usage-stats",
-              label: t("settings.entry.usage-stats.label"),
-              keywords: t("settings.entry.usage-stats.keywords"),
-              modified: changed((s) => !s.usageStats),
-              render: () => <UsageStats />,
-            },
-            {
-              id: "error-reports",
-              label: t("settings.entry.error-reports.label"),
-              keywords: t("settings.entry.error-reports.keywords"),
-              modified: changed((s) => !s.errorReports),
-              render: () => <ErrorReportsSetting />,
-            },
-            ...(info
-              ? [
-                  {
-                    id: "whats-new",
-                    label: t("settings.entry.whats-new.label"),
-                    keywords: t("settings.entry.whats-new.keywords"),
-                    render: () => <WhatsNewRow version={info.version} />,
-                  },
-                ]
-              : []),
-          ],
-        },
-        {
-          id: "help",
-          title: t("settings.group.help.title"),
-          entries: [
-            {
-              id: "report-problem",
-              label: t("settings.entry.report-problem.label"),
-              keywords: t("settings.entry.report-problem.keywords"),
-              render: () => <ReportProblemRow />,
-            },
-          ],
-        },
       ],
-      footer: info && (
-        <p className="text-center font-mono text-[11px] text-faint">
-          AgentBox {isNightly(info.version) ? `Nightly ${info.version}` : info.version} · Electron {info.electron} · {info.socket}
-        </p>
-      ),
     },
     ...(local
       ? [
@@ -1107,66 +1104,26 @@ function InstalledSettings({
         ]
       : []),
     {
-      id: "skills",
-      title: t("settings.section.skills.title"),
-      description: t("settings.section.skills.description"),
+      id: "accounts",
+      title: t("settings.section.accounts.title"),
+      description: t("settings.section.accounts.description"),
       scope: "installation",
+      nav: t("settings.nav.ai"),
+      attention: needsLook(accountSteps),
       groups: [
         {
-          id: "skills",
-          title: t("settings.group.skills.title"),
+          id: "ai",
+          title: t("settings.group.ai.title"),
           cards: true,
-          entries: [
-            {
-              id: "skills",
-              label: t("settings.section.skills.title"),
-              keywords: t("settings.entry.skills.keywords"),
-              render: () => <SkillsPanel embedded />,
-            },
-          ],
+          // Every tool's accounts are managed here even once they're done:
+          // accounts to add, rename or remove, a key to change.
+          entries: aiSteps.map((step) => stepEntry(step, ["claude", "codex", "opencode", "cursor"].includes(step.id))),
         },
-      ],
-    },
-    {
-      id: "connectors",
-      title: t("settings.section.connectors.title"),
-      description: t("settings.section.connectors.description"),
-      scope: "installation",
-      groups: [
         {
-          id: "connectors",
-          title: t("settings.group.connectors.title"),
+          id: "github",
+          title: t("settings.group.github.title"),
           cards: true,
-          entries: [
-            {
-              id: "connectors",
-              label: t("settings.section.connectors.title"),
-              keywords: t("settings.entry.connectors.keywords"),
-              render: () => <ConnectorsTab target="" embedded />,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "memory",
-      title: t("settings.section.memory.title"),
-      description: t("settings.section.memory.description"),
-      scope: "installation",
-      groups: [
-        {
-          id: "memory",
-          title: t("settings.group.memory.title"),
-          description: t("settings.group.memory.description"),
-          cards: true,
-          entries: [
-            {
-              id: "global-memory",
-              label: t("settings.section.memory.title"),
-              keywords: t("settings.entry.memory.keywords"),
-              render: () => <GlobalMemoryPanel />,
-            },
-          ],
+          entries: githubSteps.map((step) => stepEntry({ ...step, body: step.settingsBody ?? step.body }, true)),
         },
       ],
     },
@@ -1175,6 +1132,7 @@ function InstalledSettings({
       title: t("settings.section.models.title"),
       description: t("settings.section.models.description"),
       scope: "installation",
+      nav: t("settings.nav.ai"),
       groups: [
         {
           id: "new-agents",
@@ -1204,6 +1162,7 @@ function InstalledSettings({
             },
             {
               id: "cursor-model",
+              advanced: true,
               label: t("settings.entry.cursor-model.label"),
               keywords: t("settings.entry.cursor-model.keywords"),
               modified: changed((s) => s.defaultCursorModel !== ""),
@@ -1211,6 +1170,7 @@ function InstalledSettings({
             },
             {
               id: "cursor-effort",
+              advanced: true,
               label: t("settings.entry.cursor-effort.label"),
               keywords: t("settings.entry.cursor-effort.keywords"),
               modified: changed((s) => s.defaultCursorEffort !== ""),
@@ -1218,6 +1178,7 @@ function InstalledSettings({
             },
             {
               id: "enforce",
+              advanced: true,
               label: t("settings.entry.enforce.label"),
               keywords: t("settings.entry.enforce.keywords"),
               modified: changed((s) => s.enforceAgentDefaults),
@@ -1253,6 +1214,7 @@ function InstalledSettings({
           entries: [
             {
               id: "compact",
+              advanced: true,
               label: t("settings.entry.compact.label"),
               keywords: t("settings.entry.compact.keywords"),
               modified: changed((s) => s.claudeCompactWindow !== s.defaultClaudeCompactWindow),
@@ -1295,6 +1257,7 @@ function InstalledSettings({
       title: t("settings.section.agents.title"),
       description: t("settings.section.agents.description"),
       scope: "installation",
+      nav: t("settings.nav.ai"),
       groups: [
         {
           id: "pulls",
@@ -1335,19 +1298,72 @@ function InstalledSettings({
               modified: changed((s) => s.autoStopIdle),
               render: () => <AutoStopIdle />,
             },
+          ],
+        },
+      ],
+    },
+    {
+      id: "skills",
+      title: t("settings.section.skills.title"),
+      description: t("settings.section.skills.description"),
+      scope: "installation",
+      nav: t("settings.nav.ai"),
+      groups: [
+        {
+          id: "skills",
+          title: t("settings.group.skills.title"),
+          cards: true,
+          entries: [
             {
-              id: "docker-prune",
-              label: t("settings.entry.docker-prune.label"),
-              keywords: t("settings.entry.docker-prune.keywords"),
-              modified: changed((s) => !s.dockerPruneOnStop),
-              render: () => <DockerPruneOnStop />,
+              id: "skills",
+              label: t("settings.section.skills.title"),
+              keywords: t("settings.entry.skills.keywords"),
+              render: () => <SkillsPanel embedded />,
             },
+          ],
+        },
+      ],
+    },
+    {
+      id: "connectors",
+      title: t("settings.section.connectors.title"),
+      description: t("settings.section.connectors.description"),
+      scope: "installation",
+      nav: t("settings.nav.ai"),
+      groups: [
+        {
+          id: "connectors",
+          title: t("settings.group.connectors.title"),
+          cards: true,
+          entries: [
             {
-              id: "media-retention",
-              label: t("settings.entry.media-retention.label"),
-              keywords: t("settings.entry.media-retention.keywords"),
-              modified: changed((s) => s.mediaRetention !== "1d"),
-              render: () => <MediaRetention />,
+              id: "connectors",
+              label: t("settings.section.connectors.title"),
+              keywords: t("settings.entry.connectors.keywords"),
+              render: () => <ConnectorsTab target="" embedded />,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "memory",
+      title: t("settings.section.memory.title"),
+      description: t("settings.section.memory.description"),
+      scope: "installation",
+      nav: t("settings.nav.ai"),
+      groups: [
+        {
+          id: "memory",
+          title: t("settings.group.memory.title"),
+          description: t("settings.group.memory.description"),
+          cards: true,
+          entries: [
+            {
+              id: "global-memory",
+              label: t("settings.section.memory.title"),
+              keywords: t("settings.entry.memory.keywords"),
+              render: () => <GlobalMemoryPanel />,
             },
           ],
         },
@@ -1358,6 +1374,7 @@ function InstalledSettings({
       title: t("settings.section.resources.title"),
       description: t("settings.section.resources.description"),
       scope: "installation",
+      nav: t("settings.nav.machine"),
       groups: [
         {
           id: "disk",
@@ -1371,7 +1388,23 @@ function InstalledSettings({
               render: () => <DiskFloor />,
             },
             {
+              id: "media-retention",
+              label: t("settings.entry.media-retention.label"),
+              keywords: t("settings.entry.media-retention.keywords"),
+              modified: changed((s) => s.mediaRetention !== "1d"),
+              render: () => <MediaRetention />,
+            },
+            {
+              id: "docker-prune",
+              advanced: true,
+              label: t("settings.entry.docker-prune.label"),
+              keywords: t("settings.entry.docker-prune.keywords"),
+              modified: changed((s) => !s.dockerPruneOnStop),
+              render: () => <DockerPruneOnStop />,
+            },
+            {
               id: "docker-image-cache",
+              advanced: true,
               label: t("settings.entry.docker-image-cache.label"),
               keywords: t("settings.entry.docker-image-cache.keywords"),
               modified: changed((s) => !s.imageCache || s.imageCacheMaxBytes !== s.defaultImageCacheMaxBytes),
@@ -1379,6 +1412,7 @@ function InstalledSettings({
             },
             {
               id: "package-caches",
+              advanced: true,
               label: t("settings.entry.package-caches.label"),
               keywords: t("settings.entry.package-caches.keywords"),
               modified: changed((s) => !s.packageCache || s.packageCacheMaxBytes !== s.defaultPackageCacheMaxBytes),
@@ -1422,33 +1456,11 @@ function InstalledSettings({
       ],
     },
     {
-      id: "accounts",
-      title: t("settings.section.accounts.title"),
-      description: t("settings.section.accounts.description"),
-      scope: "installation",
-      attention: needsLook(accountSteps),
-      groups: [
-        {
-          id: "ai",
-          title: t("settings.group.ai.title"),
-          cards: true,
-          // Every tool's accounts are managed here even once they're done:
-          // accounts to add, rename or remove, a key to change.
-          entries: aiSteps.map((step) => stepEntry(step, ["claude", "codex", "opencode", "cursor"].includes(step.id))),
-        },
-        {
-          id: "github",
-          title: t("settings.group.github.title"),
-          cards: true,
-          entries: githubSteps.map((step) => stepEntry({ ...step, body: step.settingsBody ?? step.body }, true)),
-        },
-      ],
-    },
-    {
       id: "setup",
       title: t("settings.section.setup.title"),
       description: t("settings.section.setup.description"),
       scope: "installation",
+      nav: t("settings.nav.machine"),
       attention: needsLook(machineSteps),
       groups: [
         // Moving to a VM is offered where it can happen: without /dev/kvm,
@@ -1515,6 +1527,7 @@ function InstalledSettings({
           entries: [
             {
               id: "opencode-image",
+              advanced: true,
               label: t("settings.entry.opencode-image.label"),
               keywords: t("settings.entry.opencode-image.keywords"),
               modified: setup.data ? setup.data.image.components.opencode : undefined,
@@ -1524,10 +1537,30 @@ function InstalledSettings({
         },
       ],
     },
+    {
+      id: "experimental",
+      title: t("settings.section.experimental.title"),
+      description: t("settings.section.experimental.description"),
+      scope: "installation",
+      nav: t("settings.nav.machine"),
+      groups: [
+        {
+          id: "experimental",
+          title: t("settings.group.experimental.title"),
+          entries: [
+            {
+              id: "ui-v2",
+              label: t("settings.entry.ui-v2.label"),
+              keywords: t("settings.entry.ui-v2.keywords"),
+              modified: uiV2,
+              render: () => <UiV2Setting />,
+            },
+          ],
+        },
+      ],
+    },
     ...(projects.data ?? []).map(projectSection),
   ];
-  // v2's pages go right after General.
-  if (pages?.length) sections.splice(sections.findIndex((x) => x.id === "general") + 1, 0, ...pages);
 
   return (
     <SettingsPage
@@ -1537,8 +1570,6 @@ function InstalledSettings({
       }))}
       icons={sectionIcons}
       error={error}
-      section={section}
-      onSection={onSection}
     />
   );
 }
@@ -1554,9 +1585,8 @@ const sectionIcons: SectionIcons = {
   resources: Cpu,
   accounts: KeyRound,
   setup: Wrench,
-  overview: House,
-  media: Images,
-  pastAgents: Archive,
+  notifications: Bell,
+  experimental: FlaskConical,
 };
 
 // EnforceAgentDefaults decides what the model and window above mean to a
@@ -1837,6 +1867,21 @@ function UsageStats() {
 // TopBarDetailedSetting is the top bar's layout on this computer: one status
 // bubble for the machine, or its memory, CPU and disk always in view
 // (lib/topBarLayout.ts).
+function EnvironmentSetting() {
+  const t = useT();
+  return (
+    <SettingRow
+      label={t("settings.entry.environment.label")}
+      description={t("settings.environment.description")}
+      control={
+        <div className="w-60">
+          <EnvironmentSwitcher />
+        </div>
+      }
+    />
+  );
+}
+
 function TopBarDetailedSetting() {
   const t = useT();
   const on = useTopBarDetailed();

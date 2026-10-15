@@ -33,8 +33,8 @@ import { SidebarV2 } from "./components/v2/SidebarV2";
 import { NewTaskDialog } from "./components/v2/NewTaskDialog";
 import { ShortcutSheet } from "./components/v2/ShortcutSheet";
 import { isNewTaskShortcut, toggleNewTask } from "./lib/newTask";
+import { OverviewV2, PastAgentsV2 } from "./components/v2/PagesV2";
 import { cycleRegion, isSettingsShortcut, isSheetShortcut, toggleSheet } from "./lib/shortcuts";
-import { inSettings, pageOf, useV2Pages, viewOf } from "./components/v2/SettingsPagesV2";
 import { AgentReviewCard, ReviewV2 } from "./components/v2/ReviewV2";
 import { RightPanelHost } from "./components/v2/RightPanel";
 import { aiLabel } from "./components/state";
@@ -76,7 +76,7 @@ export type View =
 // (dev/preview.tsx's ?app=), which opens it where a scenario points.
 export function App({ initial }: { initial?: View } = {}) {
   const t = useT();
-  // UI v2, the lead-first layout (Settings → General → Experimental): its own
+  // UI v2, the lead-first layout (Settings → Experimental): its own
   // sidebar, with each project's agents under its lead and no agent rail, and
   // the review's decision in the carousel. It switches as the setting does.
   const v2 = useUiV2();
@@ -443,17 +443,7 @@ export function App({ initial }: { initial?: View } = {}) {
       });
   });
 
-  // v2 draws Overview, Media and Past agents as sections of Settings.
-  const v2Pages = useV2Pages({
-    onSelect: (next) => select(next),
-    onAddProject: () => setAddingProject(true),
-    onNewAgent: () => setNewAgentProject(""),
-  });
-  const v2Settings = v2 && inSettings(view);
-
-  const viewKey = v2Settings
-    ? `settings:${settingsVisit}`
-    : view.kind === "agent"
+  const viewKey = view.kind === "agent"
       ? view.ref
       : view.kind === "project"
         ? `project:${view.project}:${view.tab ?? ""}`
@@ -558,33 +548,36 @@ export function App({ initial }: { initial?: View } = {}) {
             )}
             {!setup && (
               <div key={viewKey} className="min-h-0 flex-1 animate-fade-in">
-                {v2Settings && (
-                  <SettingsView
-                    onHome={() => select({ kind: "home" })}
-                    pages={v2Pages}
-                    section={pageOf(view)}
-                    onSection={(id) => setView(viewOf(id))}
-                    linked={settingsLink}
-                  />
+                {view.kind === "home" &&
+                  (v2 ? (
+                    <OverviewV2
+                      onSelect={select}
+                      onAddProject={() => setAddingProject(true)}
+                      onNewAgent={() => setNewAgentProject("")}
+                    />
+                  ) : (
+                    <HomeView
+                      onSelect={select}
+                      onAddProject={() => setAddingProject(true)}
+                      onNewAgent={() => setNewAgentProject("")}
+                    />
+                  ))}
+                {view.kind === "homeChat" && (
+                  <HomeChatPanel onOverview={v2 ? () => select({ kind: "home" }) : undefined} />
                 )}
-                {!v2Settings && view.kind === "home" && (
-                  <HomeView
-                    onSelect={select}
-                    onAddProject={() => setAddingProject(true)}
-                    onNewAgent={() => setNewAgentProject("")}
-                  />
-                )}
-                {view.kind === "homeChat" && <HomeChatPanel />}
                 {view.kind === "jobs" && <JobsView />}
-                {!v2Settings && view.kind === "media" && <AllMediaView onSelect={select} />}
-                {!v2Settings && view.kind === "pastAgents" && (
-                  <PastAgents
-                    open={view.ref}
-                    onOpen={(ref) => select({ kind: "pastAgents", ref: ref ?? undefined })}
-                    onSelect={select}
-                  />
-                )}
-                {!v2Settings && view.kind === "settings" && (
+                {view.kind === "media" && <AllMediaView onSelect={select} />}
+                {view.kind === "pastAgents" &&
+                  (v2 ? (
+                    <PastAgentsV2 open={view.ref} onSelect={select} />
+                  ) : (
+                    <PastAgents
+                      open={view.ref}
+                      onOpen={(ref) => select({ kind: "pastAgents", ref: ref ?? undefined })}
+                      onSelect={select}
+                    />
+                  ))}
+                {view.kind === "settings" && (
                   <SettingsView onHome={() => select({ kind: "home" })} linked={settingsLink} />
                 )}
                 {view.kind === "project" && (
