@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { useHeaderMock } from '../lib/headerMock';
+import { ProjectCrumb, TopSlot } from './v2/HeaderMock';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Menu as MenuIcon, Search as SearchIcon, TriangleAlert, Users } from 'lucide-react';
 import type { View } from '../App';
@@ -38,6 +41,13 @@ export function TopBar({
   const agents = useQuery({ queryKey: ['agents'], queryFn: api.agents });
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
   const setup = useQuery({ queryKey: ['setup'], queryFn: api.setup, refetchInterval: 15_000 });
+
+  // MOCK (lib/headerMock.ts): v2's project header alternatives.
+  const mock = useHeaderMock();
+  const mockProject = mock && view.kind === 'project' ? projects.data?.find((p) => p.name === view.project) : undefined;
+  useEffect(() => {
+    if (mock && mockProject) document.title = projectLabel(mockProject);
+  }, [mock, mockProject]);
 
   const crumbs: { label: string; mono?: boolean; view?: View }[] = [];
   switch (view.kind) {
@@ -84,7 +94,9 @@ export function TopBar({
         <MenuIcon className="size-5" />
       </button>
       <nav className="flex min-w-32 grow basis-0 items-center gap-1.5 text-[13px]" aria-label={t('shell.top.breadcrumb')}>
-        {crumbs.map((crumb, i) => (
+        {mockProject ? (
+          mock !== 'b' && <ProjectCrumb project={mockProject} variant={mock!} />
+        ) : crumbs.map((crumb, i) => (
           <span key={i} className="flex min-w-0 items-center gap-1.5">
             {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-faint" />}
             {crumb.view ? (
@@ -101,6 +113,7 @@ export function TopBar({
       {onOpenRail && (view.kind === 'project' || view.kind === 'agent') && <RailButton view={view} onClick={onOpenRail} />}
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
+        {mock && <TopSlot />}
         {onSearch && <SearchButton onClick={onSearch} />}
         {setup.data && !setup.data.ready && view.kind !== 'settings' && (
           <button

@@ -32,6 +32,8 @@ import { Textarea } from './ui/input';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from './ui/menu';
 import { useUiV2 } from '../lib/uiV2';
 import { ProjectIcon, ProjectIconDialog } from './ProjectIcon';
+import { useHeaderMock } from '../lib/headerMock';
+import { InTopBar, ProjectMenu } from './v2/HeaderMock';
 import { TalkToProject } from './v2/TalkToProject';
 import { PanelButton } from './v2/PanelButton';
 import { openPanelOn, setPanel } from '../lib/rightPanel';
@@ -147,6 +149,7 @@ export function ProjectView({ name, tab: opensAt, onSelect, onNewAgent }: { name
   const project = projects.data?.find((p) => p.name === name);
   // The lead's chat controls join the project's ⋯ while the chat is open.
   const lead = project && tab === 'chat' && leadChat.data ? leadAgentFrom(project, leadChat.data) : undefined;
+  const mock = useHeaderMock();
   const chatMenu = useChatMenu(lead);
   const mine = agents.data?.filter((a) => a.project === name) ?? [];
   const { retire, setFreeing, setRemoving, dialogs: projectDialogs } = useProjectActions(name, onSelect);
@@ -186,6 +189,15 @@ export function ProjectView({ name, tab: opensAt, onSelect, onNewAgent }: { name
 
   return (
     <Tabs value={tab} onValueChange={setWhere} className="flex h-full min-h-0 flex-col">
+      {v2 && mock ? (
+        <InTopBar>
+          {lead && <ChatStatus agent={lead} />}
+          {chatMenu?.dialogs}
+          {chatMenu?.buttons}
+          {mock === 'a' && lead && <ProjectMenu project={project} leadRef={lead.ref} onChangeIcon={() => setIconOpen(true)} />}
+          <PanelButton project={name} chat={`${name}/${T.LeadName}`} />
+        </InTopBar>
+      ) : (
       <div className="w-full shrink-0 px-4 pb-3 pt-4 md:px-8 md:pb-4 md:pt-5">
         <div className="flex flex-wrap items-center gap-3">
           {v2 ? (
@@ -274,6 +286,7 @@ export function ProjectView({ name, tab: opensAt, onSelect, onNewAgent }: { name
           </div>
         )}
       </div>
+      )}
 
       <TabsContent value="chat" className="flex flex-col">
         <div className="mx-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line md:mx-6 md:mb-6">
