@@ -1547,7 +1547,7 @@ export function seedSettings(queryClient: QueryClient): void {
     appearance: 'follow',
     available: true,
     name: 'Tokyo Night',
-    mode: 'dark',
+    mode: new URLSearchParams(location.search).get('theme') === 'light' ? 'light' : 'dark',
     background: '#1a1b26',
     surface: '#24283b',
     foreground: '#c0caf5',

@@ -13,12 +13,17 @@ import { composeIn } from '../../lib/drafts';
 import { useT } from '../../lib/i18n';
 import { projectLabel } from '../../lib/projectName';
 import { ProjectIcon } from '../ProjectIcon';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import type { ReactNode } from 'react';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '../ui/popover';
 
-export function TalkToProject({ project, leadRef }: { project: string; leadRef: string }) {
+// With `anchor` the picker is opened from elsewhere (a menu item) and hangs
+// under that element, controlled by `open`; without it, it has its own button.
+export function TalkToProject({ project, leadRef, anchor, open: controlled, onOpenChange }: { project: string; leadRef: string; anchor?: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const t = useT();
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
-  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  const setOpen = onOpenChange ?? setOwn;
   const others = (projects.data ?? []).filter((p) => p.name !== project);
   if (others.length === 0) return null;
   const write = (other: T.Project, how: 'ask' | 'align') => {
@@ -27,6 +32,9 @@ export function TalkToProject({ project, leadRef }: { project: string; leadRef: 
   };
   return (
     <Popover open={open} onOpenChange={setOpen}>
+      {anchor ? (
+        <PopoverAnchor asChild>{anchor}</PopoverAnchor>
+      ) : (
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -37,6 +45,7 @@ export function TalkToProject({ project, leadRef }: { project: string; leadRef: 
           {t('v2.talk.button')}
         </button>
       </PopoverTrigger>
+      )}
       <PopoverContent align="end" className="w-[340px] max-w-[calc(100vw-1rem)] p-1.5" data-v2-talk-picker>
         <div className="px-2 pb-1.5 pt-1">
           <div className="text-[13px] font-medium text-title">{t('v2.talk.title')}</div>

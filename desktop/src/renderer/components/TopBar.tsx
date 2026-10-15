@@ -4,10 +4,12 @@ import type { View } from '../App';
 import { api } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { projectLabel } from '../lib/projectName';
-import type * as T from '../../shared/api';
+import * as T from '../../shared/api';
 import { limitTone, windowLeft, windowNow } from '../lib/tokens';
 import { pickMeter } from '../lib/usageMeter';
 import { useNow } from '../lib/useNow';
+import { useUiV2 } from '../lib/uiV2';
+import { ProjectCrumb, TopSlot } from './v2/ProjectHeader';
 import { cn, shortcut, timeAgo, timeUntil } from '../lib/utils';
 import { DiskGuardPill } from './DiskGuardPill';
 import { ImageBuildChip } from './ImageBuildChip';
@@ -38,6 +40,11 @@ export function TopBar({
   const agents = useQuery({ queryKey: ['agents'], queryFn: api.agents });
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
   const setup = useQuery({ queryKey: ['setup'], queryFn: api.setup, refetchInterval: 15_000 });
+
+  const v2 = useUiV2();
+  // v2 names the project once, by its icon, in the top bar's breadcrumb.
+  const crumbProject = v2 && (view.kind === 'project' || view.kind === 'agent') ? projects.data?.find((p) => p.name === (view.kind === 'project' ? view.project : view.ref.split('/')[0])) : undefined;
+  const crumbThen = view.kind === 'project' ? T.LeadName : view.kind === 'agent' ? agents.data?.find((a) => a.ref === view.ref)?.title || view.ref.split('/')[1] : '';
 
   const crumbs: { label: string; mono?: boolean; view?: View }[] = [];
   switch (view.kind) {
@@ -84,7 +91,9 @@ export function TopBar({
         <MenuIcon className="size-5" />
       </button>
       <nav className="flex min-w-32 grow basis-0 items-center gap-1.5 text-[13px]" aria-label={t('shell.top.breadcrumb')}>
-        {crumbs.map((crumb, i) => (
+        {crumbProject ? (
+          <ProjectCrumb project={crumbProject} then={crumbThen} />
+        ) : crumbs.map((crumb, i) => (
           <span key={i} className="flex min-w-0 items-center gap-1.5">
             {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-faint" />}
             {crumb.view ? (
@@ -101,6 +110,7 @@ export function TopBar({
       {onOpenRail && (view.kind === 'project' || view.kind === 'agent') && <RailButton view={view} onClick={onOpenRail} />}
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
+        {v2 && <TopSlot />}
         {onSearch && <SearchButton onClick={onSearch} />}
         {setup.data && !setup.data.ready && view.kind !== 'settings' && (
           <button
