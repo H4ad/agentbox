@@ -11,7 +11,7 @@
 // days. The reading is lib/leadFirst.ts's and lib/projectOrder.ts's.
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowUpDown, Check, ChevronRight, CircleArrowUp, Ellipsis, FolderPlus, House, ListChecks, ListFilter, LoaderCircle, Pin, PinOff, RefreshCw, Search, Settings, Smile, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronRight, CircleArrowUp, Ellipsis, FolderPlus, House, ListChecks, ListFilter, LoaderCircle, Pin, PinOff, RefreshCw, Search, Settings, Smile, SquarePen, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as A from '../../../shared/api';
 import type * as T from '../../../shared/api';
@@ -28,7 +28,8 @@ import { useNow } from '../../lib/useNow';
 import { updateHint } from '../../lib/appUpdate';
 import { isUpgrade } from '../../lib/nightly';
 import { useAppUpdate } from '../../lib/useAppUpdate';
-import { cn, errorMessage, timeAgo } from '../../lib/utils';
+import { cn, errorMessage, shortcut, timeAgo } from '../../lib/utils';
+import { openNewTask } from '../../lib/newTask';
 import { EnvironmentSwitcher } from '../EnvironmentSwitcher';
 import { Logo } from '../Sidebar';
 import { ProjectIcon, ProjectIconDialog } from '../ProjectIcon';
@@ -194,6 +195,7 @@ export function SidebarV2({ view, onSelect, onAddProject }: { view: View; onSele
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-1" aria-label={t('v2.sidebar.chats')}>
+        <NewTaskRow />
         <HomeRow active={view.kind === 'homeChat'} onClick={() => onSelect({ kind: 'homeChat' })} />
         <FilterBar filters={filters} onFilters={onFilters} projects={projects.data ?? []} rows={rows} />
         {projects.data?.length === 0 && (
@@ -478,6 +480,26 @@ function Lead({ active, onClick, children, data }: { active: boolean; onClick: (
     >
       {children}
     </div>
+  );
+}
+
+// NewTaskRow opens New task (NewTaskDialog): pick a project, or none for the
+// Home chat, and its chat opens to write the task in.
+function NewTaskRow() {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      onClick={openNewTask}
+      className="group mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] font-medium text-secondary transition-colors hover:bg-surface hover:text-title"
+      data-v2-new-task
+    >
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        <SquarePen className="size-4" />
+      </span>
+      <span className="flex-1">{t('v2.sidebar.newTask')}</span>
+      <kbd className="rounded-md bg-surface-raised px-1.5 font-mono text-[10.5px] text-subtle">{shortcut('N')}</kbd>
+    </button>
   );
 }
 
