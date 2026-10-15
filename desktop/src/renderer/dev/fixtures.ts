@@ -1707,10 +1707,13 @@ export function installDevBridge(): void {
       if (method === 'PATCH' && path === '/v1/settings') return patchDefaults(body as T.UpdateSettingsRequest);
       const page = pageRequest(method, path);
       if (page) return page;
-      const past = pastRequest(method, path, body);
-      if (past) return past;
+      // No project has a saved base: Settings' Repository says so.
+      if (method === 'GET' && /^\/v1\/projects\/[^/]+\/base$/.test(path)) return { status: 404, body: JSON.stringify({ error: 'no base' }), contentType: 'application/json' };
+      // Files first: a past agent's are under /v1/archived-agents too.
       const files = filesRequest(method, path);
       if (files) return files;
+      const past = pastRequest(method, path, body);
+      if (past) return past;
       for (const answer of devRequests) {
         const res = answer(method, path, body);
         if (res) return res;
