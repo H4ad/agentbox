@@ -159,5 +159,5 @@ func (c *conversation) resumeNow() {
 	c.cancelResume()
 	it := c.add("user", "")
 	it.Turn, it.Text = it.ID, resumeNudge
-	c.beginTurn(it, resumeNudge, nil)
+	c.beginTurn(it, resumeNudge, attached{})
 }

@@ -1891,6 +1891,7 @@ export interface ChatItem {
   kind: string;
   text?: string;
   images?: ChatImage[];
+  files?: ChatFile[];
   delivery?: string;
   woken?: boolean;
   hidden?: boolean;
@@ -1990,6 +1991,7 @@ export interface ChatTurnResult {
 export interface ChatMessageRequest {
   text: string;
   images?: ChatImageUpload[];
+  files?: ChatFileUpload[];
 }
 
 export interface ChatImage {
@@ -2003,6 +2005,20 @@ export interface ChatImageUpload {
   mimeType: string;
   data: string;
   name?: string;
+}
+
+export interface ChatFile {
+  id: string;
+  name: string;
+  mimeType?: string;
+  size: number;
+  path?: string;
+}
+
+export interface ChatFileUpload {
+  name: string;
+  mimeType?: string;
+  data: string;
 }
 
 export interface ChatAnswerRequest {
@@ -2053,6 +2069,7 @@ export interface ChatCacheChoice {
   compact: boolean;
   text?: string;
   images?: ChatImageUpload[];
+  files?: ChatFileUpload[];
 }
 
 export interface LeadRunners {
