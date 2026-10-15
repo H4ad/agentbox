@@ -1946,6 +1946,7 @@ export interface ChatItem {
   compaction?: ChatCompaction;
   handoff?: string;
   projectMessage?: ChatProjectMessage;
+  agentPermission?: ChatAgentPermission;
   parent?: string;
   createdAt: string;
   updatedAt: string;
@@ -2021,6 +2022,16 @@ export interface ChatProjectMessage {
   topic?: string;
   expectsReply?: boolean;
   hop: number;
+}
+
+export interface ChatAgentPermission {
+  agent: string;
+  ref: string;
+  title?: string;
+  ai: string;
+  item: string;
+  permission: ChatPermission;
+  tool?: ChatTool;
 }
 
 export interface ChatTurnResult {
