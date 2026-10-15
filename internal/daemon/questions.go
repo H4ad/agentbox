@@ -405,6 +405,7 @@ func (s *Server) noticeAgentFinished(ctx context.Context, a state.Agent, end cha
 	if cur, err := s.store.Agent(ctx, a.Project, a.Name); err == nil && cur.Status == state.AgentCreating {
 		return
 	}
+	defer s.freeAfterTurn(ctx, a)
 	v, note := judgeTurn(end)
 	if v == verdictEnded && end.LastMessage == "" {
 		// Read only when the words are what decides: the conversation is
