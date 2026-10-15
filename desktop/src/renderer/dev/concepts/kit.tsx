@@ -77,7 +77,7 @@ export function Checks({ pr }: { pr: NonNullable<MockAgent['pr']> }) {
 // Conversation draws a chat's lines; tool lines are one quiet row.
 export function Conversation({ lines, ai = 'claude' }: { lines: Line[]; ai?: string }) {
   return (
-    <div className="mx-auto grid w-full max-w-[720px] gap-3 px-5 py-5">
+    <div className="mx-auto grid w-full max-w-[720px] grid-cols-[minmax(0,1fr)] gap-3 px-5 py-5">
       {lines.map((l, i) =>
         l.who === 'user' ? (
           <div key={i} className="ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-surface-strong px-3.5 py-2 text-[13px] text-primary">

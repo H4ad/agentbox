@@ -55,6 +55,7 @@ import { screen } from '../notifications';
 import { agentLines, leadLines, type MockAgent, project, projects } from './data';
 import { Avatar, Composer, Conversation, Kbd, ProjectMark, Time } from './kit';
 import { allAgents, keyOf, type Media, type Review, reviewOf } from './reviewData';
+import { PanelButton, panelBox, panelOn, RightPanel, usePanel } from './rightPanel';
 
 // ——— The world, as this concept sees it ———
 
@@ -200,14 +201,20 @@ interface Ctx {
   go: (view: string) => void;
   narrow: boolean;
   phone: boolean;
+  panel: ReturnType<typeof usePanel>;
 }
 
 export function LeadFirstConcept() {
   const [s, setS] = useState(initial);
+  const panel = usePanel();
   const set = (patch: Partial<S> | ((s: S) => Partial<S>)) => setS((prev) => ({ ...prev, ...(typeof patch === 'function' ? patch(prev) : patch) }));
   const width = useWidth();
   const narrow = width < 1024;
-  const phone = width < 640;
+  // With the right-hand panel open beside it, the chat can be as narrow as a
+  // phone's, and its header and review card then fold the same way.
+  const box = panelBox(panel.p.variant, width);
+  const chatWidth = width - (narrow ? 0 : 288) - (panelOn && panel.p.open && !box.drawer ? box.width : 0);
+  const phone = width < 640 || chatWidth < 480;
   const phase = (key: string) => s.phases[key];
   const st = (a: MockAgent) => stOf(a, phase(keyOf(a)));
   const queue = useMemo(
@@ -222,6 +229,7 @@ export function LeadFirstConcept() {
     queue,
     narrow,
     phone,
+    panel,
     openReview: (key, walk) => set({ modal: key, slide: 0, compose: false, draft: '', inbox: false, walk: walk ? queue : null }),
     go: (view) => set({ view, nav: false, inbox: false }),
   };
@@ -249,9 +257,18 @@ export function LeadFirstConcept() {
         {current ? <AgentView ctx={ctx} a={current} /> : <LeadView ctx={ctx} />}
         {s.inbox && <InboxPanel ctx={ctx} />}
       </main>
+      {panelOn && (
+        <RightPanel
+          {...panel}
+          {...box}
+          proj={current?.project ?? (s.view.startsWith('lead:') ? s.view.slice(5) : 'agentbox')}
+          agents={world.filter((x) => x.project === (current?.project ?? (s.view.startsWith('lead:') ? s.view.slice(5) : 'agentbox'))).sort((x, y) => x.mins - y.mins)}
+          follow={current?.name ?? null}
+        />
+      )}
       {s.modal && <ReviewModal key={s.modal} ctx={ctx} k={s.modal} />}
       <div className="pointer-events-none fixed bottom-3 left-3 z-[40] rounded-full border border-line bg-modal/90 px-3 py-1 text-[11px] font-medium text-secondary shadow-lg backdrop-blur max-lg:hidden">
-        Concept E · lead-first
+        Concept E · lead-first{panelOn && ` · panel ${panel.p.variant}`}
       </div>
     </div>
   );
@@ -604,7 +621,7 @@ function Header({ ctx, a }: { ctx: Ctx; a?: MockAgent }) {
             <Plus className="size-3.5" /> {!phone && 'New agent'}
           </span>
         )}
-        <IconBtn label="More"><Ellipsis className="size-4" /></IconBtn>
+        {panelOn ? <PanelButton {...ctx.panel} fresh={3} /> : <IconBtn label="More"><Ellipsis className="size-4" /></IconBtn>}
         <span className="mx-1 h-5 w-px bg-line" />
         {!phone && <IconBtn label="Search ⌘K"><Search className="size-4" /></IconBtn>}
         {!phone && <span title="Machine: all well" className="flex size-7 items-center justify-center"><span className="size-2 rounded-full bg-emerald-400" /></span>}
@@ -683,7 +700,7 @@ function ReviewCard({ ctx, a, r, f, phase }: { ctx: Ctx; a: MockAgent; r: Review
           {asked ? <LoaderCircle className="size-4 shrink-0 animate-spin text-amber-300" /> : <CircleCheck className="size-4 shrink-0 text-sky-300" />}
           <span className="shrink-0 text-[12.5px] font-medium text-title">{asked ? 'Changes requested' : phase === 'updated' ? 'Updated, ready to review' : 'Ready to review'}</span>
         </span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-subtle">
+        <span className="flex min-w-[200px] flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-subtle">
           {made.length > 0 && (
             <span className="inline-flex items-center gap-1">
               <Images className="size-3.5 text-faint" /> {made.join(' · ')}
