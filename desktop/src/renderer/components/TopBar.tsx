@@ -9,7 +9,7 @@ import { limitTone, windowLeft, windowNow } from '../lib/tokens';
 import { noLimits, pickMeter } from '../lib/usageMeter';
 import { useNow } from '../lib/useNow';
 import { useUiV2 } from '../lib/uiV2';
-import { ProjectCrumb, TopSlot } from './v2/ProjectHeader';
+import { ProjectCrumb, TopEndSlot, TopSlot } from './v2/ProjectHeader';
 import { cn, shortcut, timeAgo, timeUntil } from '../lib/utils';
 import { ToolMark } from './state';
 import { DiskGuardPill } from './DiskGuardPill';
@@ -130,7 +130,11 @@ export function TopBar({
         <DiskGuardPill onSelect={onSelect} />
         <ClaudeUsage view={view} agents={agents.data ?? []} />
         <MachineStatus agents={agents.data ?? []} onSelect={onSelect} />
-        <Inbox onOpen={onOpenNotice ?? (() => {})} onSelect={onSelect} />
+        {/* v2 has no inbox: what needs you is where it's answered, the lead
+            chat's cards and the sidebar's rows, and review is the sidebar's. */}
+        {!v2 && <Inbox onOpen={onOpenNotice ?? (() => {})} onSelect={onSelect} />}
+        {/* In its place, the page's ⋯ and Panel, at the far right. */}
+        {v2 && <TopEndSlot />}
       </div>
     </header>
   );
