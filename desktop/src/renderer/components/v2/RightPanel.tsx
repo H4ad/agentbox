@@ -60,6 +60,7 @@ import {
 } from '../../lib/rightPanel';
 import { cn, errorMessage, shortcut } from '../../lib/utils';
 import { BrowserTab } from '../BrowserTab';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { FileBrowser } from '../files/FilePanel';
 import { MediaTab } from '../MediaTab';
 import { PageIcon } from '../pages/PageThumb';
@@ -755,10 +756,12 @@ function TabBody({ project, chat, tab, whose, agents, past, loaded, width, secti
 }
 
 function Body({ project, chat, whose, tab, agents, past, width, onPick }: { project: string; chat: string; whose: Whose; tab: PanelKind; agents: T.Agent[]; past: T.ArchivedAgent[]; width: number; onPick: (w: Whose) => void }) {
+  const t = useT();
   if (!hasTab(whose, tab)) return <ChooseTarget project={project} chat={chat} kind={tab} whose={whose} agents={agents} past={past} onPick={onPick} />;
   if (whose.kind === 'agent' && needsMachine(tab) && machineOf(whose.agent) === 'asleep') return <Asleep agent={whose.agent} tab={tab} />;
   return (
-    <div className="flex min-h-0 flex-1 flex-col" key={`${whoseRef(whose)}:${tab}`}>
+    <ErrorBoundary key={`${whoseRef(whose)}:${tab}`} fallback={<p className="p-4 text-xs text-subtle">{t('panel.failed')}</p>}>
+    <div className="flex min-h-0 flex-1 flex-col">
       {tab === 'files' && <Files project={project} whose={whose} width={width} />}
       {tab === 'desktop' && whose.kind === 'agent' && <BrowserTab agent={whose.agent} onOpenMedia={() => openPanelOn(chat, 'media', whoseRef(whose))} />}
       {tab === 'terminal' && whose.kind === 'agent' && <AgentTerminal agent={whose.agent} />}
@@ -766,6 +769,7 @@ function Body({ project, chat, whose, tab, agents, past, width, onPick }: { proj
       {tab === 'pages' && <Pages project={project} whose={whose} agents={agents} />}
       {tab === 'media' && <Media project={project} whose={whose} />}
     </div>
+    </ErrorBoundary>
   );
 }
 

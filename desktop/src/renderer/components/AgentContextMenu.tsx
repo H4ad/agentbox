@@ -10,6 +10,7 @@ import { api, type AgentAction } from '../lib/api';
 import { useT, type MessageKey } from '../lib/i18n';
 import { countFeature, type AppFeature } from '../lib/usageStats';
 import { AgentInfoCard } from './AgentInfoCard';
+import { ErrorBoundary } from './ErrorBoundary';
 import { DestroyAgentDialog } from './DestroyAgentDialog';
 import { useUiV2 } from '../lib/uiV2';
 import { openPanelOn } from '../lib/rightPanel';
@@ -125,7 +126,9 @@ export function AgentContextMenu({
           </ContextMenuTrigger>
           <TooltipPrimitive.Portal>
             <TooltipPrimitive.Content side={infoSide} sideOffset={6} className="z-[60] max-w-none animate-fade-in rounded-lg border border-line-strong bg-overlay p-3 text-xs text-secondary shadow-xl backdrop-blur">
-              <AgentInfoCard agent={agent} pr={pr} />
+              <ErrorBoundary>
+                <AgentInfoCard agent={agent} pr={pr} />
+              </ErrorBoundary>
             </TooltipPrimitive.Content>
           </TooltipPrimitive.Portal>
         </TooltipPrimitive.Root>
@@ -196,7 +199,9 @@ export function AgentContextMenu({
       <Dialog open={showingInfo} onOpenChange={setShowingInfo}>
         <DialogContent className="max-w-sm">
           <DialogTitle className="sr-only">{t('agent.menu.infoTitle', { name: agent.title || agent.name })}</DialogTitle>
-          <AgentInfoCard agent={agent} pr={pr} />
+          <ErrorBoundary>
+                <AgentInfoCard agent={agent} pr={pr} />
+              </ErrorBoundary>
         </DialogContent>
       </Dialog>
     </>
