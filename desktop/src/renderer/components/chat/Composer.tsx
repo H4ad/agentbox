@@ -8,6 +8,7 @@ import {
   Cpu,
   SlidersHorizontal,
   File,
+  Bot,
   FolderGit2,
   Gauge,
   Hourglass,
@@ -36,9 +37,9 @@ import { api, isHomeChat, isProjectChat } from '../../lib/api';
 import { composerSkills, searchSkills, skillMentionAt } from '../../lib/skills';
 import { SkillTile } from '../SkillsPanel';
 import { contextBadge, contextHint, currentPlan, formatTokens, isMessage, pendingPermissions, toolOf, toolsReload } from '../../lib/chat';
-import { choiceName, groupChoices, isRecommended, matchesQuery, searchThreshold, unavailableValue } from '../../lib/modelChoices';
+import { choiceName, currentFirst, groupChoices, isRecommended, matchesQuery, searchThreshold, unavailableValue } from '../../lib/modelChoices';
 import { FileLinks } from '../files/FilePanel';
-import { mentionAt, matchFiles, matchProjects, mentionLimit, type MentionItem } from '../../lib/mentions';
+import { mentionAt, matchAgents, matchFiles, matchProjects, mentionLimit, type MentionItem } from '../../lib/mentions';
 import { onComposerFocus, takeComposerFocus } from '../../lib/newTask';
 import { composeEvent, getDraft, setDraft } from '../../lib/drafts';
 import { formatTime, t as translate, useT } from '../../lib/i18n';
@@ -300,11 +301,13 @@ export function Composer({
   const mentionQuery = mention?.query;
   const filesQuery = useQuery({ queryKey: ['files', agent.ref], queryFn: () => api.files(agent.ref), enabled: mention !== undefined, staleTime: 4000 });
   const projectsQuery = useQuery({ queryKey: ['projects'], queryFn: api.projects, enabled: mention !== undefined });
+  const agentsQuery = useQuery({ queryKey: ['agents'], queryFn: api.agents, enabled: mention !== undefined });
   const mentionItems = useMemo(() => {
     if (mentionQuery === undefined || mentionKey === mentionDismissed) return [];
     const projects = matchProjects(projectsQuery.data ?? [], mentionQuery);
-    return [...projects, ...matchFiles(filesQuery.data?.files ?? [], mentionQuery, mentionLimit)];
-  }, [mentionQuery, mentionKey, mentionDismissed, filesQuery.data, projectsQuery.data]);
+    const agents = matchAgents((agentsQuery.data ?? []).filter((a) => (home || a.project === agent.project) && a.ref !== agent.ref), mentionQuery);
+    return [...projects, ...agents, ...matchFiles(filesQuery.data?.files ?? [], mentionQuery, mentionLimit)];
+  }, [mentionQuery, mentionKey, mentionDismissed, filesQuery.data, projectsQuery.data, agentsQuery.data, home, agent.project, agent.ref]);
   useEffect(() => setMentionHighlighted(0), [mentionKey]);
 
   // Sending while the tool works is the point of the placeholder below: the
@@ -573,7 +576,7 @@ export function Composer({
         }}
         onDrop={onDrop}
         className={cn(
-          'relative z-10 rounded-[22px] border border-line-strong bg-composer/85 shadow-[0_24px_60px_-28px_var(--ab-shadow-deep),inset_0_1px_0_rgb(255_255_255/0.04)] backdrop-blur-xl transition-colors focus-within:border-line-vivid',
+          'relative z-10 rounded-[22px] border border-line-strong bg-composer/85 shadow-[0_24px_60px_-28px_var(--ab-shadow-deep),inset_0_1px_0_rgb(255_255_255/0.04)] backdrop-blur-xl transition-colors focus-within:border-line-vivid focus-within:ring-2 focus-within:ring-brand-400/60',
           dragging && 'border-brand-400/80 bg-brand-500/5',
         )}
       >
@@ -641,7 +644,7 @@ export function Composer({
                     pickMention(item);
                   }}
                 >
-                  {item.kind === 'project' ? <FolderGit2 className="size-3.5 shrink-0 text-subtle" /> : <File className="size-3.5 shrink-0 text-subtle" />}
+                  {item.kind === 'project' ? <FolderGit2 className="size-3.5 shrink-0 text-subtle" /> : item.kind === 'agent' ? <Bot className="size-3.5 shrink-0 text-subtle" /> : <File className="size-3.5 shrink-0 text-subtle" />}
                   <span className="min-w-0 truncate font-mono text-[12.5px] text-primary">{item.label}</span>
                 </button>
                 {item.kind === 'file' && fileLinks && (
@@ -815,8 +818,8 @@ function PermissionBanner({ agent, thread, request, count }: { agent: T.Agent; t
           pending={answer.isPending}
           sending={answer.variables}
           onAnswer={(id) => answer.mutate(id)}
-          approveLabel={approval ? t('chat.permission.approve') : t('chat.permission.allow')}
-          denyLabel={approval ? t('chat.permission.refuse') : t('chat.permission.deny')}
+          approveLabel={t('chat.permission.allow')}
+          denyLabel={t('chat.permission.deny')}
           keys
         />
       </div>
@@ -1234,7 +1237,8 @@ function OptionChoices({
   // treatMissingAsUnavailable is false for a session that hasn't started:
   // its value may be an unresolved alias, not a rejection.
   const missing = treatMissingAsUnavailable ? unavailableValue(option.choices, option.value) : undefined;
-  const groups = groupChoices(option.choices.filter((c) => matchesQuery(c, query)));
+  const listed = groupChoices(option.choices.filter((c) => matchesQuery(c, query)));
+  const groups = isModel ? currentFirst(listed, option.value) : listed;
   const searchable = option.choices.length >= searchThreshold;
   return (
     <>
