@@ -115,6 +115,10 @@ export interface SectionProjects {
   projects: string[];
 }
 
+export interface SidebarLayout {
+  hidden: string[];
+}
+
 export interface Notes {
   text: string;
   updatedAt?: string;

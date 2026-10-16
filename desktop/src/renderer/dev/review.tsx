@@ -338,7 +338,16 @@ export function seedV2(queryClient: QueryClient, pins: string | null): void {
   queryClient.setQueryData(['projects'], projects);
   if (pins) localStorage.setItem('agentbox.v2.projects', JSON.stringify({ pins: pins.split(',') }));
   const json = (v: unknown) => ({ status: 200, body: JSON.stringify(v), contentType: 'application/json' });
+  // The sidebar's hidden projects (&hidden=a,b), kept as the daemon would
+  // until the page reloads.
+  const hiddenParam = new URLSearchParams(location.search).get('hidden');
+  let sidebar: T.SidebarLayout = { hidden: hiddenParam ? hiddenParam.split(',') : [] };
   devRequests.push((method, path, body) => {
+    if (path === '/v1/sidebar' && method === 'GET') return json(sidebar);
+    if (path === '/v1/sidebar' && method === 'PUT') {
+      sidebar = body as T.SidebarLayout;
+      return json(sidebar);
+    }
     if (method === 'GET' && path === '/v1/projects') return json(projects);
     // Only agentbox has agents waiting; the other projects' lists are empty pages.
     if (method === 'GET' && /^\/v1\/projects\/[^/]+\/review/.test(path) && !path.startsWith(`/v1/projects/${PROJECT}/`)) return json(pageOf([]));

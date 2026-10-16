@@ -7,13 +7,14 @@
 // filter popover (T3Code's: state, project, removable chips) narrow it. The
 // projects the user pinned come first, in the order they dragged them, then
 // the ones with something going on, most recent first, then, folded, the Idle
-// list of the rest, which opens by itself when nothing is going on. The
+// list of the rest, always last and folded unless nothing is going on, and
+// last of all the projects the user hid, folded. The
 // project on screen never folds into Idle: the chat you're in stays in view.
 // A project's options are on a right-click of its row. The reading is
-// lib/leadFirst.ts's and lib/projectOrder.ts's.
+// lib/leadFirst.ts's, lib/projectOrder.ts's and lib/sidebarHidden.ts's.
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Archive, Check, ChevronRight, CircleArrowUp, FolderPlus, House, ListFilter, LoaderCircle, RefreshCw, Search, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
+import { Archive, Check, ChevronRight, CircleArrowUp, Eye, EyeOff, FolderPlus, House, ListFilter, LoaderCircle, RefreshCw, Search, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
 import * as A from '../../../shared/api';
 import type * as T from '../../../shared/api';
@@ -23,7 +24,9 @@ import { useT, type MessageKey } from '../../lib/i18n';
 import { pageItems, useQuestions, useReviewHead } from '../../lib/inboxPages';
 import { activeProjects, agentSt, attention, awaitsApproval, countSt, filterCount, leadLine, leadBusy, liveOrder, projectRows, toggle, type AgentSt, type Filters, type ProjectRows, type Row } from '../../lib/leadFirst';
 import { movePin, orderProjects, togglePin } from '../../lib/projectOrder';
-import { setFilterChoice, setIdleOpen, setPins, useV2Projects } from '../../lib/v2Projects';
+import { setFilterChoice, setHiddenOpen, setPins, useV2Projects } from '../../lib/v2Projects';
+import { arrange, hide, unhide } from '../../lib/sidebarHidden';
+import { useSidebarLayout } from '../../lib/useSidebarLayout';
 import { useGrace } from '../../lib/grace';
 import { projectLabel } from '../../lib/projectName';
 import { useReviewing } from '../../lib/reviewAlert';
@@ -38,7 +41,7 @@ import { openPanelOn } from '../../lib/rightPanel';
 import { AgentContextMenu } from '../AgentContextMenu';
 import { Logo } from '../Sidebar';
 import { ProjectIcon, ProjectIconDialog } from '../ProjectIcon';
-import { ReviewCount } from './ReviewV2';
+import { ReviewCount, useOpenReview } from './ReviewV2';
 import { projectActions, type ProjectAction } from './ProjectHeader';
 import { TalkToProject } from './TalkToProject';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuMore, ContextMenuSeparator, ContextMenuTrigger } from '../ui/context-menu';
@@ -130,18 +133,51 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
   }, [projects.data, activity.data, active, kept.pins]);
   const pinned = new Set(kept.pins);
   const ctx = { busy, keep: pinned };
+  const { layout, save } = useSidebarLayout();
+  const hiddenSet = new Set(layout.hidden);
+  // A hidden project comes back while it has something going on, which the
+  // project on screen alone doesn't count as: opened from Hidden, it stays there.
+  const arranged = arrange(order, layout, activeGrace);
   const lists = {
-    pinned: projectRows(order.pinned, rows, filters, expanded, label, ctx),
-    rest: projectRows(order.rest, rows, filters, expanded, label, ctx),
-    idle: projectRows(order.idle, rows, filters, expanded, label, ctx),
+    pinned: projectRows(arranged.pinned, rows, filters, expanded, label, ctx),
+    rest: projectRows(arranged.rest, rows, filters, expanded, label, ctx),
+    idle: projectRows(arranged.idle, rows, filters, expanded, label, ctx),
+    hidden: projectRows(arranged.hidden, rows, filters, expanded, label, ctx),
   };
+  const searching = q.trim() !== '';
   // Until the agents are in, every project would read idle.
   const loaded = !!agents.data;
   // With nothing above it, the Idle list is the list: open, and not a fold.
   const idleOnly = lists.pinned.length + lists.rest.length === 0;
+  // Otherwise it is folded, and a click opens it only until something starts:
+  // an agent starting never leaves it open under the project it started in.
+  const [idleOpened, setIdleOpened] = useState(false);
+  useEffect(() => setIdleOpened(false), [idleOnly]);
   // A search looks in it too, and opens it on a match.
-  const idleOpen = idleOnly || kept.idleOpen || (q.trim() !== '' && lists.idle.length > 0);
-  const nothing = projects.data && projects.data.length > 0 && lists.pinned.length + lists.rest.length + lists.idle.length === 0;
+  const idleOpen = idleOnly || idleOpened || (searching && lists.idle.length > 0);
+  const hiddenOpen = kept.hiddenOpen || (searching && lists.hidden.length > 0) || (!!onScreen && lists.hidden.some((p) => p.project.name === onScreen));
+  const nothing = projects.data && projects.data.length > 0 && lists.pinned.length + lists.rest.length + lists.idle.length + lists.hidden.length === 0;
+
+  // Review all goes after the first list's label, whichever list is first.
+  const openReview = useOpenReview();
+  const toReview = reviewing ? (head.data?.total ?? 0) : 0;
+  let reviewPlaced = false;
+  const reviewAll = () => {
+    if (reviewPlaced || !openReview || toReview === 0) return null;
+    reviewPlaced = true;
+    return (
+      <Tip label={t('v2.review.allHint')}>
+        <button
+          type="button"
+          onClick={() => openReview()}
+          className="ml-1.5 shrink-0 rounded-full border border-line-strong bg-surface px-1.5 py-px text-[10.5px] font-medium normal-case tracking-normal tabular-nums text-secondary transition hover:border-line-heavy hover:bg-surface-strong hover:text-title"
+          data-v2-review-all={toReview}
+        >
+          {t('v2.review.all', { count: toReview })}
+        </button>
+      </Tip>
+    );
+  };
 
   const lead = (p: ProjectRows, pin?: { draggable: true }) => (
     <ProjectLead
@@ -152,11 +188,18 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       approvals={p.approvals}
       open={p.open}
       pinned={pinned.has(p.project.name)}
+      hidden={hiddenSet.has(p.project.name)}
       view={view}
       onToggle={() =>
         setExpanded((s) => new Map(s).set(p.project.name, !p.open))
       }
-      onPin={() => setPins(togglePin(kept.pins, p.project.name))}
+      onPin={() => {
+        const pin = !pinned.has(p.project.name);
+        setPins(togglePin(kept.pins, p.project.name));
+        // Pinning a hidden project brings it back.
+        if (pin && hiddenSet.has(p.project.name)) save(unhide(layout, p.project.name));
+      }}
+      onHide={() => save(hiddenSet.has(p.project.name) ? unhide(layout, p.project.name) : hide(layout, p.project.name))}
       onSelect={onSelect}
       onNewAgent={() => onNewAgent(p.project.name)}
       drag={
@@ -201,13 +244,13 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
         )}
         {loaded && lists.pinned.length > 0 && (
           <div data-v2-pinned>
-            <ListHead>{t('v2.sidebar.pinned')}</ListHead>
+            <ListHead extra={reviewAll()}>{t('v2.sidebar.pinned')}</ListHead>
             {lists.pinned.map((p) => lead(p, { draggable: true }))}
           </div>
         )}
         {loaded && lists.rest.length > 0 && (
           <div data-v2-rest>
-            <ListHead>{t('shell.sidebar.projects')}</ListHead>
+            <ListHead extra={reviewAll()}>{t('shell.sidebar.projects')}</ListHead>
             {lists.rest.map((p) => lead(p))}
           </div>
         )}
@@ -215,7 +258,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
         {loaded && lists.idle.length > 0 && (
           <div className={cn(!idleOnly && 'mt-2')} data-v2-idle={idleOnly ? 'only' : idleOpen ? 'open' : 'closed'}>
             {idleOnly ? (
-              <ListHead>
+              <ListHead extra={reviewAll()}>
                 {t('v2.sidebar.idle')}
                 <span className="ml-1.5 font-normal tabular-nums normal-case tracking-normal text-subtle">{lists.idle.length}</span>
               </ListHead>
@@ -223,7 +266,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
               <button
                 type="button"
                 aria-expanded={idleOpen}
-                onClick={() => setIdleOpen(!kept.idleOpen)}
+                onClick={() => setIdleOpened(!idleOpened)}
                 className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-line px-2.5 py-1.5 text-left text-[12px] text-secondary hover:border-line-strong hover:bg-surface hover:text-title"
                 data-v2-idle-toggle
               >
@@ -234,6 +277,23 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
               </button>
             )}
             {idleOpen && <div className={cn(!idleOnly && 'opacity-80')}>{lists.idle.map((p) => lead(p))}</div>}
+          </div>
+        )}
+        {loaded && lists.hidden.length > 0 && (
+          <div className="mt-2 opacity-70" data-v2-hidden={hiddenOpen ? 'open' : 'closed'}>
+            <button
+              type="button"
+              aria-expanded={hiddenOpen}
+              onClick={() => setHiddenOpen(!kept.hiddenOpen)}
+              className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-left text-[11.5px] text-subtle hover:bg-surface hover:text-secondary"
+              data-v2-hidden-toggle
+            >
+              <ChevronRight className={cn('size-3 shrink-0 transition-transform', hiddenOpen && 'rotate-90')} />
+              <EyeOff className="size-3 shrink-0" />
+              <span>{t('v2.sidebar.hidden')}</span>
+              <span className="tabular-nums">· {lists.hidden.length}</span>
+            </button>
+            {hiddenOpen && lists.hidden.map((p) => lead(p))}
           </div>
         )}
       </nav>
@@ -274,10 +334,11 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
   );
 }
 
-function ListHead({ children }: { children: ReactNode }) {
+function ListHead({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
   return (
     <div className="flex h-7 items-center px-2.5 pt-2">
       <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-subtle">{children}</span>
+      {extra}
     </div>
   );
 }
@@ -505,9 +566,11 @@ function ProjectLead({
   approvals,
   open,
   pinned,
+  hidden,
   view,
   onToggle,
   onPin,
+  onHide,
   onSelect,
   onNewAgent,
   drag,
@@ -518,9 +581,11 @@ function ProjectLead({
   approvals: number;
   open: boolean;
   pinned: boolean;
+  hidden: boolean;
   view: View;
   onToggle: () => void;
   onPin: () => void;
+  onHide: () => void;
   onSelect: (view: View) => void;
   onNewAgent: () => void;
   drag?: Drag;
@@ -654,7 +719,13 @@ function ProjectLead({
           </Lead>
         </ContextMenuTrigger>
         <ContextMenuContent data-v2-project-menu={project.name}>
-          {[...main.flatMap(item), <ContextMenuMore key="more" label={t('common.more')}>{more.flatMap(item)}</ContextMenuMore>]}
+          {[
+            ...main.flatMap(item),
+            <ContextMenuItem key="hide" icon={hidden ? Eye : EyeOff} onSelect={onHide} data-v2-project-action={hidden ? 'unhide' : 'hide'}>
+              {t(hidden ? 'v2.sidebar.unhide' : 'v2.sidebar.hide')}
+            </ContextMenuItem>,
+            <ContextMenuMore key="more" label={t('common.more')}>{more.flatMap(item)}</ContextMenuMore>,
+          ]}
         </ContextMenuContent>
       </ContextMenu>
       {/* Talk to another project's picker hangs under the row. */}

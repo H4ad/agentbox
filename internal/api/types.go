@@ -216,6 +216,18 @@ type ProjectLayout struct {
 	Loose []string `json:"loose"`
 }
 
+// SidebarLayout is how UI v2's sidebar arranges the projects: for now, the
+// ones the user hid. It belongs to the installation, so every window and the
+// phone app read the same one; v1's sections (D79) never see it, and nothing
+// but the sidebar reads it. GET /v1/sidebar reads it and PUT /v1/sidebar
+// replaces it whole, answering with what was kept: each project once, and
+// none that's gone.
+type SidebarLayout struct {
+	// Hidden are the projects hidden from the sidebar, which shows one again
+	// only while it has something going on.
+	Hidden []string `json:"hidden"`
+}
+
 // SectionProjects is one section of a ProjectLayout: which one, and what is
 // in it, in order.
 type SectionProjects struct {

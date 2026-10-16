@@ -1463,6 +1463,14 @@
     "click": "[data-v2-idle-toggle]"
   },
   {
+    "id": "window-wide-v2-hidden-dark",
+    "description": "UI v2 at 1920×1080 with two projects hidden and the Hidden list open at the very bottom, under the Idle fold — dark",
+    "query": "app=project&v2=1&pins=storefront&hidden=dotfiles,old-blog&theme=dark",
+    "width": 1920,
+    "height": 1080,
+    "click": "[data-v2-hidden-toggle]"
+  },
+  {
     "id": "window-wide-v2-talk-dark",
     "description": "UI v2 at 1920×1080, the lead's Talk to another project picker from the project's ⋯, each project with its icon, Ask and Align — dark",
     "query": "app=project&v2=1&theme=dark",
