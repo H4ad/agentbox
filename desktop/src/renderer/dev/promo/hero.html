@@ -1,0 +1,483 @@
+<!doctype html>
+<!--
+  The showcase hero: "one lead, many agents", drawn from the app's own palette,
+  type and marks (styles.css, AgentCharacter.tsx), as a still for Discord,
+  Reddit and link previews. scripts/promo.mjs renders it; ?v= picks a layout
+  (flow, plane, burst) and ?og=1 frames it for a 1200×630 preview.
+-->
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+@font-face { font-family: "Inter Variable"; font-weight: 100 900; src: url("../../../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono Variable"; font-weight: 100 800; src: url("../../../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2") format("woff2"); }
+
+:root {
+  --brand-300: #c4b5fd; --brand-400: #a78bfa; --brand-500: #8b5cf6; --brand-600: #7c3aed;
+  --mid: #6366f1; --deep: #4f46e5; --far: #38bdf8;
+  --ink: #07070b; --chat: #09090d; --composer: #131318; --stage: #0a0a0f;
+  --title: #fafafa; --primary: #f4f4f5; --secondary: #e4e4e7; --tertiary: #d4d4d8;
+  --muted: #a1a1aa; --subtle: #71717a; --faint: #52525b; --ghost: #3f3f46;
+  --line: rgb(255 255 255 / 0.065); --line-strong: rgb(255 255 255 / 0.1); --line-vivid: rgb(255 255 255 / 0.15);
+  --surface: rgb(255 255 255 / 0.05); --surface-raised: rgb(255 255 255 / 0.065); --surface-strong: rgb(255 255 255 / 0.09);
+  --emerald: #34d399; --amber: #fbbf24; --rose: #fb7185; --claude: #d97757;
+  --sans: "Inter Variable", system-ui, sans-serif;
+  --mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--ink); }
+body { font-family: var(--sans); color: var(--primary); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+body.og { width: 1200px; height: 630px; }
+
+#stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0;
+  background:
+    radial-gradient(1100px 620px at 50% -8%, rgb(139 92 246 / 0.20), transparent 70%),
+    radial-gradient(900px 600px at 100% 0%, rgb(56 189 248 / 0.08), transparent 70%),
+    radial-gradient(900px 700px at 0% 100%, rgb(79 70 229 / 0.10), transparent 70%),
+    var(--ink);
+}
+#grid { position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(1200px 760px at 50% 45%, black, transparent 80%);
+}
+#vignette { position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  background: radial-gradient(1500px 900px at 50% 50%, transparent 55%, rgb(0 0 0 / 0.55));
+}
+#grain { position: absolute; inset: 0; pointer-events: none; z-index: 51; opacity: 0.06; mix-blend-mode: overlay; }
+
+#world { position: absolute; inset: 0; transform-style: preserve-3d; }
+#flat { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+#wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+
+/* A panel, as .panel in styles.css: a faint gradient down a card and a lifted edge. */
+.panel { position: absolute; border-radius: 16px; border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.018)), rgb(13 13 18 / 0.92);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.06) inset, 0 30px 60px -24px rgb(0 0 0 / 0.9), 0 0 0 1px rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(14px);
+}
+
+/* Agent tile */
+.agent { width: 300px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.agent .hd { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.av { position: relative; flex: none; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: linear-gradient(135deg, rgb(139 92 246 / 0.22), rgb(99 102 241 / 0.07) 50%, transparent);
+  display: grid; place-items: center; }
+.av svg { width: 60%; height: 60%; }
+.av .dot { position: absolute; right: -3px; bottom: -3px; width: 10px; height: 10px; border-radius: 99px; box-shadow: 0 0 0 2px var(--ink); }
+.agent.asking .av { border-color: rgb(251 191 36 / 0.45); background: linear-gradient(135deg, rgb(251 191 36 / 0.2), transparent 60%); box-shadow: 0 0 14px -6px rgb(251 191 36 / 0.7); }
+.ttl { min-width: 0; flex: 1; }
+.ttl .name { font-size: 13.5px; font-weight: 600; color: var(--title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.ttl .br { margin-top: 2px; font: 500 10.5px/1.2 var(--mono); color: var(--subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+.ttl .br svg { flex: none; width: 11px; height: 11px; stroke: var(--brand-400); }
+.chip { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; padding: 3px 7px; border-radius: 99px; border: 1px solid; }
+.chip i { width: 6px; height: 6px; border-radius: 99px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.chip.working { color: var(--brand-300); border-color: rgb(167 139 250 / 0.3); background: rgb(139 92 246 / 0.12); }
+.chip.review { color: #6ee7b7; border-color: rgb(52 211 153 / 0.3); background: rgb(52 211 153 / 0.1); }
+.chip.asking { color: #fcd34d; border-color: rgb(251 191 36 / 0.35); background: rgb(251 191 36 / 0.1); }
+.chip.merged { color: var(--brand-300); border-color: rgb(167 139 250 / 0.3); background: rgb(139 92 246 / 0.16); }
+
+.thumb { position: relative; height: 96px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--stage); }
+.thumb.term { padding: 8px 10px; font: 500 9.5px/1.48 var(--mono); color: var(--tertiary); white-space: pre; background: linear-gradient(180deg, #0b0b11, #08080c); }
+.thumb.term .c-b { color: var(--brand-400); } .thumb.term .c-g { color: var(--emerald); } .thumb.term .c-s { color: var(--subtle); }
+.thumb.term .c-y { color: var(--amber); } .thumb.term .c-o { color: #e59a7c; } .thumb.term .c-k { color: var(--far); }
+.cur { display: inline-block; width: 6px; height: 11px; background: var(--brand-300); vertical-align: -2px; box-shadow: 0 0 8px var(--brand-400); }
+.thumb .tag { position: absolute; right: 6px; top: 6px; font: 600 8.5px/1 var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 3px 5px; border-radius: 5px; background: rgb(0 0 0 / 0.55); border: 1px solid var(--line); }
+.thumb .tag b { display: inline-block; width: 5px; height: 5px; border-radius: 9px; background: #f43f5e; margin-right: 4px; vertical-align: 1px; box-shadow: 0 0 6px #f43f5e; }
+
+/* desktop thumbnail: a little browser */
+.desk { background: #0d0d14; }
+.desk .bar { height: 15px; display: flex; align-items: center; gap: 3px; padding: 0 6px; background: #16161d; border-bottom: 1px solid var(--line); }
+.desk .bar i { width: 5px; height: 5px; border-radius: 9px; background: var(--ghost); }
+.desk .bar u { margin-left: 6px; flex: 1; height: 8px; border-radius: 4px; background: rgb(255 255 255 / 0.06); font: 500 6px/8px var(--mono); color: var(--subtle); text-decoration: none; padding-left: 5px; }
+.desk .pg { position: absolute; inset: 15px 0 0 0; display: flex; }
+.desk .side { width: 46px; border-right: 1px solid var(--line); padding: 6px 5px; display: flex; flex-direction: column; gap: 4px; background: rgb(0 0 0 / 0.25); }
+.desk .side span { height: 5px; border-radius: 3px; background: rgb(255 255 255 / 0.08); }
+.desk .side span.on { background: rgb(139 92 246 / 0.5); }
+.desk .main { flex: 1; padding: 7px; display: flex; flex-direction: column; gap: 5px; }
+.desk .row { display: flex; gap: 5px; }
+.blk { border-radius: 4px; background: rgb(255 255 255 / 0.06); border: 1px solid rgb(255 255 255 / 0.04); }
+.blk.v { background: linear-gradient(135deg, rgb(139 92 246 / 0.55), rgb(79 70 229 / 0.35)); border-color: rgb(167 139 250 / 0.4); }
+.blk.s { background: linear-gradient(135deg, rgb(56 189 248 / 0.35), rgb(56 189 248 / 0.1)); }
+.blk.g { background: rgb(52 211 153 / 0.25); }
+.ln { height: 4px; border-radius: 2px; background: rgb(255 255 255 / 0.1); }
+.phone { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); width: 50px; height: 100px; border-radius: 9px; border: 2px solid #2a2a33; background: #101017; padding: 7px 4px; display: flex; flex-direction: column; gap: 3px; }
+
+.agent .ft { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--muted); }
+.tool { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px 2px 4px; border-radius: 6px; background: var(--surface-raised); border: 1px solid var(--line); font-weight: 600; color: var(--secondary); }
+.tool svg { width: 13px; height: 13px; }
+.ft .ref { font-family: var(--mono); color: var(--subtle); }
+.ft .diff { margin-left: auto; font-family: var(--mono); font-weight: 600; }
+.ft .diff .a { color: var(--emerald); } .ft .diff .d { color: var(--rose); }
+
+/* Lead chat */
+.lead { display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.01)), var(--chat);
+  border-color: rgb(167 139 250 / 0.28);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.08) inset, 0 0 0 1px rgb(0 0 0 / 0.5), 0 40px 90px -30px rgb(0 0 0 / 0.95), 0 0 120px -20px rgb(139 92 246 / 0.45);
+}
+.lead .top { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); background: rgb(0 0 0 / 0.2); }
+.logo { flex: none; width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #a78bfa, #7c3aed 55%, #4f46e5); display: grid; place-items: center; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.15) inset, 0 6px 20px -6px rgb(124 58 237 / 0.8); }
+.logo svg { width: 62%; height: 62%; }
+.lead .top .t { font-size: 15px; font-weight: 650; color: var(--title); letter-spacing: -0.01em; }
+.lead .top .s { font-size: 11.5px; color: var(--subtle); margin-top: 1px; }
+.lead .top .pill { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted); padding: 4px 9px; border-radius: 99px; border: 1px solid var(--line-strong); background: var(--surface); display: flex; gap: 6px; align-items: center; }
+.lead .top .pill i { width: 6px; height: 6px; border-radius: 9px; background: var(--emerald); box-shadow: 0 0 8px var(--emerald); }
+.lead .msgs { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.bubble { align-self: flex-end; max-width: 86%; padding: 11px 14px; border-radius: 16px 16px 4px 16px; background: linear-gradient(135deg, rgb(139 92 246 / 0.28), rgb(79 70 229 / 0.2)); border: 1px solid rgb(167 139 250 / 0.28); font-size: 13.5px; line-height: 1.5; color: var(--primary); }
+.reply { font-size: 13.5px; line-height: 1.55; color: var(--secondary); }
+.reply b { color: var(--title); font-weight: 600; }
+.calls { display: flex; flex-direction: column; gap: 6px; }
+.call { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgb(255 255 255 / 0.03); font-size: 12px; color: var(--tertiary); }
+.call .ic { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: rgb(139 92 246 / 0.15); border: 1px solid rgb(167 139 250 / 0.25); }
+.call .ic svg { width: 14px; height: 14px; }
+.call code { font: 500 11px var(--mono); color: var(--brand-300); }
+.call .k { margin-left: auto; font: 500 10.5px var(--mono); color: var(--subtle); }
+.call .ok { color: var(--emerald); font-weight: 700; }
+.composer { margin: 0 14px 14px; border-radius: 14px; background: var(--composer); border: 1px solid var(--line-strong); padding: 12px 14px 10px; box-shadow: 0 -10px 30px -10px rgb(0 0 0 / 0.6); }
+.composer .ph { font-size: 13.5px; color: var(--subtle); }
+.composer .row { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.composer .row .m svg { width: 13px; height: 13px; }
+.composer .row .m { padding: 3px 8px; border-radius: 7px; background: var(--surface); border: 1px solid var(--line); display: flex; gap: 5px; align-items: center; font-weight: 600; }
+.composer .send { margin-left: auto; width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, var(--brand-400), var(--brand-600)); display: grid; place-items: center; box-shadow: 0 4px 16px -4px rgb(139 92 246 / 0.9); }
+
+/* Review & merge stack */
+.stack { position: absolute; }
+.stack .h { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-size: 12px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.stack .h .n { padding: 1px 7px; border-radius: 99px; background: rgb(52 211 153 / 0.12); color: #6ee7b7; border: 1px solid rgb(52 211 153 / 0.3); letter-spacing: 0; }
+.pr { position: relative; padding: 14px 16px; }
+.pr .r1 { display: flex; align-items: center; gap: 8px; }
+.pr .num { font: 600 12px var(--mono); color: var(--subtle); }
+.pr .t { font-size: 14px; font-weight: 600; color: var(--title); letter-spacing: -0.01em; line-height: 1.35; margin-top: 6px; }
+.pr .meta { margin-top: 10px; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+.pr .meta .ck { color: var(--emerald); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.pr .meta .df { font-family: var(--mono); font-weight: 600; }
+.pr .meta .df .a { color: var(--emerald); } .pr .meta .df .d { color: var(--rose); }
+.pr .shot { margin-top: 12px; height: 118px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; position: relative; background: #0d0d14; }
+.mergebtn { display: inline-flex; margin-left: auto; border-radius: 9px; overflow: hidden; box-shadow: 0 6px 22px -6px rgb(52 211 153 / 0.7); }
+.mergebtn span { padding: 6px 12px; font-size: 12px; font-weight: 650; color: #052e1f; background: linear-gradient(180deg, #6ee7b7, #34d399); display: flex; align-items: center; gap: 6px; }
+.mergebtn span + span { padding: 6px 7px; border-left: 1px solid rgb(5 46 31 / 0.25); }
+.ghostbtn { padding: 6px 11px; font-size: 12px; font-weight: 600; border-radius: 9px; color: var(--secondary); background: var(--surface-strong); border: 1px solid var(--line-strong); }
+.merged-list { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+.mrow { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 11px; border: 1px solid var(--line); background: rgb(255 255 255 / 0.025); font-size: 12px; color: var(--tertiary); }
+.mrow svg { flex: none; width: 15px; height: 15px; stroke: var(--brand-400); }
+.mrow .num { font: 600 11px var(--mono); color: var(--subtle); }
+.mrow .w { margin-left: auto; font-size: 10.5px; color: var(--subtle); }
+
+/* Type */
+.wordmark { position: absolute; display: flex; align-items: center; gap: 12px; z-index: 60; }
+.wordmark .logo { width: 38px; height: 38px; border-radius: 10px; }
+.wordmark span { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--title); }
+.url { position: absolute; z-index: 60; font: 500 15px var(--mono); color: var(--muted); letter-spacing: 0.01em; }
+.url b { color: var(--brand-300); font-weight: 500; }
+.headline { position: absolute; z-index: 60; font-weight: 750; letter-spacing: -0.045em; line-height: 0.98; color: var(--title); }
+.headline em { font-style: normal; background: linear-gradient(100deg, #c4b5fd, #a78bfa 30%, #818cf8 60%, #38bdf8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sub { position: absolute; z-index: 60; font-size: 20px; line-height: 1.45; color: var(--muted); letter-spacing: -0.005em; }
+.sub b { color: var(--secondary); font-weight: 550; }
+
+.far { filter: blur(1.6px) brightness(0.72) saturate(0.85); }
+.farther { filter: blur(3px) brightness(0.55) saturate(0.8); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+  <div id="world"><svg id="wires"></svg></div>
+  <canvas id="grain" width="1920" height="1080"></canvas>
+  <div id="vignette"></div>
+  <div id="flat"></div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const V = params.get('v') || 'flow';
+
+// ---- marks (AgentCharacter.tsx, idle; the app's logo from build/icon.svg) ----
+const CODEX_CLOUD = 'M9.064 3.344a4.578 4.578 0 012.285-.312c1 .115 1.891.54 2.673 1.275.01.01.024.017.037.021a.09.09 0 00.043 0 4.55 4.55 0 013.046.275l.047.022.116.057a4.581 4.581 0 012.188 2.399c.209.51.313 1.041.315 1.595a4.24 4.24 0 01-.134 1.223.123.123 0 00.03.115c.594.607.988 1.33 1.183 2.17.289 1.425-.007 2.71-.887 3.854l-.136.166a4.548 4.548 0 01-2.201 1.388.123.123 0 00-.081.076c-.191.551-.383 1.023-.74 1.494-.9 1.187-2.222 1.846-3.711 1.838-1.187-.006-2.239-.44-3.157-1.302a.107.107 0 00-.105-.024c-.388.125-.78.143-1.204.138a4.441 4.441 0 01-1.945-.466 4.544 4.544 0 01-1.61-1.335c-.152-.202-.303-.392-.414-.617a5.81 5.81 0 01-.37-.961 4.582 4.582 0 01-.014-2.298.124.124 0 00.006-.056.085.085 0 00-.027-.048 4.467 4.467 0 01-1.034-1.651 3.896 3.896 0 01-.251-1.192 5.189 5.189 0 01.141-1.6c.337-1.112.982-1.985 1.933-2.618.212-.141.413-.251.601-.33.215-.089.43-.164.646-.227a.098.098 0 00.065-.066 4.51 4.51 0 01.829-1.615 4.535 4.535 0 011.837-1.388z';
+let gid = 0;
+function mark(ai) {
+  if (ai === 'claude') return `<svg viewBox="0 0 24 24"><path fill="#DE8A6E" d="M3 5h18v12.08h-1.49V20H18v-2.92h-1.49V20H15v-2.92H9V20H7.49v-2.92H6V20H4.49v-2.92H3v-3.03H0v-3.1h3z"/><rect x="18.5" y="10.95" width="5.5" height="3.1" fill="#DE8A6E"/><g fill="#3D2B25"><rect x="6.15" y="8.5" width="1.2" height="2.1" rx="0.3"/><rect x="16.66" y="8.5" width="1.2" height="2.1" rx="0.3"/></g></svg>`;
+  if (ai === 'codex') { const id = 'cx' + gid++; return `<svg viewBox="0 0 24 24"><defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="12" x2="12" y1="3" y2="21"><stop stop-color="#C9C2FF"/><stop offset=".5" stop-color="#97B2FF"/><stop offset="1" stop-color="#6670FF"/></linearGradient></defs><path d="${CODEX_CLOUD}" fill="url(#${id})"/><g stroke="#fff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8.2 10.15l1 1.9-1 1.85"/><path d="M12.9 14.2h2.9"/></g></svg>`; }
+  return `<svg viewBox="0 0 24 24"><rect x="8" y="10" width="8" height="8" fill="#5a5454"/><path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" fill-rule="evenodd" fill="#e4dede"/><g fill="#e4dede"><rect x="9.8" y="12.4" width="1.2" height="1.9" rx="0.3"/><rect x="13" y="12.4" width="1.2" height="1.9" rx="0.3"/></g></svg>`;
+}
+const LOGO = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+const BRANCH = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 5.5"/></svg>`;
+const MERGE = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="18" r="2.6"/><circle cx="6" cy="6" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M6 8.6v6.8M6 8.6c0 5 4 8.4 9.4 9.4"/></svg>`;
+const TOOLNAME = { claude: 'Claude Code', codex: 'Codex', opencode: 'OpenCode' };
+const DOT = { working: '#a78bfa', review: '#34d399', asking: '#fbbf24', merged: '#a78bfa' };
+
+// ---- what each agent's screen shows ----
+const T = {
+  claudeTests: `<span class="c-o">⏺</span> Bash(go test ./internal/api)
+  <span class="c-s">⎿</span> <span class="c-g">ok</span>  internal/api      <span class="c-s">2.31s</span>
+  <span class="c-s">⎿</span> <span class="c-g">ok</span>  internal/daemon   <span class="c-s">6.84s</span>
+<span class="c-o">⏺</span> Update(ReviewModal.tsx)
+  <span class="c-s">⎿</span> <span class="c-g">+38</span> <span class="c-y">-12</span> footer pinned
+<span class="c-o">✻</span> <span class="c-s">Recording the walkthrough…</span> <span class="cur"></span>`,
+  codexType: `<span class="c-k">›</span> npm run typecheck
+  <span class="c-g">✓</span> tsc --noEmit  <span class="c-s">0 errors</span>
+<span class="c-k">•</span> Edited <span class="c-b">src/lib/usage.ts</span> <span class="c-g">+24</span> <span class="c-y">-3</span>
+<span class="c-k">•</span> Ran npm test <span class="c-s">— 412 passed</span>
+<span class="c-k">›</span> gh pr create --title "feat: …"
+  <span class="c-g">✓</span> <span class="c-s">github.com/…/pull/</span>349 <span class="cur"></span>`,
+  ocLimit: `<span class="c-b">▌</span> build  <span class="c-s">internal/chat/limits.go</span>
+<span class="c-s">  │</span> resume at 14:00 when the
+<span class="c-s">  │</span> window resets
+<span class="c-g">✓</span> go vet ./...
+<span class="c-g">✓</span> golangci-lint run  <span class="c-s">0 issues</span>
+<span class="c-b">▌</span> <span class="c-s">thinking</span> <span class="cur"></span>`,
+  hub: `<span class="c-k">•</span> hub.Dial wss://hub…/v1
+<span class="c-k">•</span> registered <span class="c-b">agentbox-7f3c</span>
+<span class="c-y">?</span> <span class="c-y">Keep the old address as a</span>
+<span class="c-y">  redirect for 30 days?</span>
+  <span class="c-s">[ yes ]  [ no ]</span>
+<span class="c-s">waiting for the lead…</span>`,
+  ctrlk: `<span class="c-b">▌</span> plan
+<span class="c-s">  1.</span> render previews with
+<span class="c-s">     </span>Markdown, inline only
+<span class="c-s">  2.</span> strip code fences
+<span class="c-g">✓</span> node --test markdown.test.ts
+<span class="c-b">▌</span> <span class="c-s">editing CommandPalette.tsx</span> <span class="cur"></span>`,
+  crash: `<span class="c-o">⏺</span> Read(AgentInfoCard.tsx)
+<span class="c-o">⏺</span> Update(AgentInfoCard.tsx)
+  <span class="c-s">⎿</span> usage.data?.agents?.find
+<span class="c-o">⏺</span> Write(ErrorBoundary.tsx)
+<span class="c-o">⏺</span> Bash(npm --prefix desktop test)
+  <span class="c-s">⎿</span> <span class="c-g">✓ 1,284 passing</span>`,
+};
+const D = {
+  app: `<div class="pg"><div class="side"><span class="on"></span><span></span><span></span><span></span><span></span><span style="width:60%"></span></div><div class="main"><div class="row"><div class="blk v" style="width:40%;height:22px"></div><div class="blk" style="flex:1;height:22px"></div></div><div class="ln" style="width:80%"></div><div class="ln" style="width:55%"></div><div class="row"><div class="blk" style="flex:1;height:26px"></div><div class="blk s" style="flex:1;height:26px"></div><div class="blk" style="flex:1;height:26px"></div></div></div></div>`,
+  browser: `<div class="pg" style="flex-direction:column;padding:8px 10px;gap:5px"><div class="row" style="gap:6px;align-items:center"><div class="blk v" style="width:12px;height:12px;border-radius:4px"></div><div class="ln" style="width:30%"></div><div class="ln" style="width:12%;margin-left:auto"></div></div><div class="row" style="gap:6px"><div class="blk" style="flex:2;height:40px"></div><div class="blk g" style="flex:1;height:40px"></div></div><div class="ln" style="width:70%"></div><div class="ln" style="width:44%"></div></div>`,
+  settings: `<div class="pg"><div class="side"><span></span><span></span><span class="on"></span><span></span><span></span></div><div class="main"><div class="ln" style="width:35%;height:6px;background:rgb(255 255 255 / 0.2)"></div><div class="row" style="align-items:center"><div class="ln" style="flex:1"></div><div class="blk v" style="width:20px;height:10px;border-radius:9px"></div></div><div class="row" style="align-items:center"><div class="ln" style="flex:1"></div><div class="blk" style="width:20px;height:10px;border-radius:9px"></div></div><div class="row" style="align-items:center"><div class="ln" style="flex:1"></div><div class="blk v" style="width:20px;height:10px;border-radius:9px"></div></div></div></div>`,
+  tour: `<div class="pg" style="align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%, rgb(139 92 246 / 0.25), transparent 70%)"><div class="blk" style="width:62%;height:58px;padding:6px;display:flex;flex-direction:column;gap:4px;background:rgb(20 20 28 / 0.95);border-color:rgb(167 139 250 / 0.4)"><div class="ln" style="width:50%;background:rgb(255 255 255 / 0.3)"></div><div class="ln" style="width:85%"></div><div class="ln" style="width:70%"></div><div class="row" style="margin-top:auto;justify-content:flex-end"><div class="blk v" style="width:24px;height:9px"></div></div></div></div>`,
+};
+function thumb(a) {
+  if (a.term) return `<div class="thumb term">${T[a.term]}</div>`;
+  if (a.android) return `<div class="thumb" style="background:linear-gradient(180deg,#0e0e15,#0a0a0f)"><div class="phone"><div class="ln" style="width:60%;background:rgb(255 255 255 / 0.25)"></div><div class="blk" style="height:22px"></div><div class="row" style="gap:3px"><div class="blk g" style="flex:1;height:9px"></div><div class="blk" style="flex:1;height:9px"></div></div><div class="ln"></div><div class="ln" style="width:70%"></div><div class="blk v" style="height:10px;margin-top:auto"></div></div><span class="tag"><b></b>Android</span></div>`;
+  return `<div class="thumb desk"><div class="bar"><i></i><i></i><i></i><u>${a.url}</u></div>${D[a.desk]}<span class="tag"><b></b>Desktop</span></div>`;
+}
+const STATE = { working: 'Working', review: 'PR', asking: 'Asking', merged: 'Merged' };
+function agentHTML(a) {
+  const chip = a.state === 'review' ? `<span class="chip review"><i></i>#${a.pr}</span>` : `<span class="chip ${a.state}"><i></i>${STATE[a.state]}</span>`;
+  return `<div class="hd"><span class="av">${mark(a.ai)}<span class="dot" style="background:${DOT[a.state]}"></span></span>
+    <div class="ttl"><div class="name">${a.title}</div><div class="br">${BRANCH}agentbox/${a.branch}</div></div>${chip}</div>
+    ${thumb(a)}
+    <div class="ft"><span class="tool">${mark(a.ai)}${TOOLNAME[a.ai]}</span><span class="ref">${a.ref}</span><span class="diff"><span class="a">+${a.add}</span> <span class="d">−${a.del}</span></span></div>`;
+}
+
+const AGENTS = [
+  { ref: 'agent-438', ai: 'claude', title: 'Review modal footer', branch: 'review-footer', state: 'working', term: 'claudeTests', add: 142, del: 18 },
+  { ref: 'agent-439', ai: 'codex', title: 'Sidebar pins and Idle list', branch: 'sidebar-pins', state: 'review', pr: 351, desk: 'app', url: 'localhost:5173/?app=project', add: 311, del: 96 },
+  { ref: 'agent-420', ai: 'claude', title: 'End-to-end QA sweep', branch: 'fix-e2e-qa-sweep', state: 'working', desk: 'browser', url: 'localhost:5173/pulls', add: 87, del: 40 },
+  { ref: 'agent-436', ai: 'codex', title: 'Codex usage meter', branch: 'codex-usage-meter', state: 'review', pr: 349, term: 'codexType', add: 208, del: 11 },
+  { ref: 'agent-433', ai: 'claude', title: 'Phone review actions', branch: 'phone-review-actions', state: 'working', android: true, add: 264, del: 35 },
+  { ref: 'agent-431', ai: 'codex', title: 'Hub: stable address', branch: 'hub-stable-address', state: 'asking', term: 'hub', add: 59, del: 7 },
+  { ref: 'agent-437', ai: 'opencode', title: 'Settings redesign', branch: 'settings-redesign', state: 'review', pr: 350, desk: 'settings', url: 'localhost:5173/?app=settings', add: 486, del: 203 },
+  { ref: 'agent-434', ai: 'opencode', title: 'Usage-limit pause', branch: 'usage-limit-pause', state: 'working', term: 'ocLimit', add: 133, del: 22 },
+  { ref: 'agent-432', ai: 'claude', title: 'First-run tour', branch: 'first-run-tour', state: 'working', desk: 'tour', url: 'localhost:5173/?tour=1', add: 402, del: 64 },
+  { ref: 'agent-430', ai: 'opencode', title: 'Markdown in Ctrl+K', branch: 'ctrlk-markdown', state: 'working', term: 'ctrlk', add: 76, del: 19 },
+  { ref: 'agent-429', ai: 'claude', title: 'Fix the hover crash', branch: 'agentinfo-crash', state: 'review', pr: 352, term: 'crash', add: 48, del: 9 },
+  { ref: 'agent-435', ai: 'codex', title: 'Desktop aspect ratio', branch: 'desktop-aspect', state: 'working', desk: 'app', url: 'localhost:6080/vnc', add: 91, del: 30 },
+];
+
+const SPAWN = `<svg viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M12 8v8M8 12h8"/></svg>`;
+function leadHTML(o = {}) {
+  const calls = (o.calls || [['agent-438', 'claude', 'review-footer'], ['agent-439', 'codex', 'sidebar-pins'], ['agent-437', 'opencode', 'settings-redesign'], ['agent-420', 'claude', 'fix-e2e-qa-sweep']])
+    .map(([r, ai, b]) => `<div class="call"><span class="ic">${SPAWN}</span><span>spawn</span><code>${r}</code><span class="tool" style="padding:1px 6px 1px 3px;font-size:10.5px">${mark(ai)}${TOOLNAME[ai]}</span><span class="k">${b}</span></div>`).join('');
+  return `<div class="top"><span class="logo">${LOGO}</span><div><div class="t">Lead</div><div class="s">agentbox · 12 agents</div></div><span class="pill"><i></i>Opus 5.5</span></div>
+  <div class="msgs">
+    <div class="bubble">Fix the review modal's footer, add pins to the sidebar, redesign Settings, and run a full QA sweep. Open a PR for each.</div>
+    <div class="reply">On it. Each gets its own machine, branch and desktop, so they won't step on each other:</div>
+    <div class="calls">${calls}</div>
+    ${o.more ? `<div class="reply"><b>agent-439</b> opened <b>#351</b>: pins, the Idle list and Hidden, with a recording. Checks are green, it's <b>ready for review</b>.</div>` : ''}
+  </div>
+  <div class="composer"><div class="ph">Ask the lead…</div><div class="row"><span class="m">${mark('claude')}Claude Code</span><span class="m">medium</span><span class="m">1M</span><span class="send"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span></div></div>`;
+}
+
+function stackHTML(o = {}) {
+  const top = `<div class="panel pr" style="position:relative;z-index:3">
+    <div class="r1"><span class="chip review"><i></i>Ready</span><span class="num">#351</span><span class="tool" style="margin-left:auto;padding:1px 6px 1px 3px;font-size:10.5px">${mark('codex')}agent-439</span></div>
+    <div class="t">feat: pin projects and agents in the sidebar, with an Idle list</div>
+    <div class="meta"><span class="ck">✓ 14/14 checks</span><span class="df"><span class="a">+311</span> <span class="d">−96</span></span><span>2 recordings</span></div>
+    ${o.shot === false ? '' : `<div class="shot"><div class="desk" style="position:absolute;inset:0"><div class="bar"><i></i><i></i><i></i><u>Review · #351</u></div>${D.app}</div><div style="position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:99px;background:rgb(0 0 0 / 0.55);border:1px solid rgb(255 255 255 / 0.25);display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M7 4v16l13-8z"/></svg></div></div>`}
+    <div class="meta" style="margin-top:12px"><span class="ghostbtn">Request changes</span><span class="mergebtn"><span>${MERGE.replace('stroke-width="2"', 'stroke="#052e1f" stroke-width="2.4" width="13" height="13"')}Merge</span><span>▾</span></span></div>
+  </div>`;
+  const behind = (n, t, dy, s, op) => `<div class="panel pr" style="position:absolute;left:0;right:0;top:0;transform:translateY(${dy}px) scale(${s});transform-origin:50% 0;opacity:${op};z-index:${2 - Math.round(dy / -14)}"><div class="r1"><span class="chip review"><i></i>Ready</span><span class="num">#${n}</span></div><div class="t">${t}</div></div>`;
+  const merged = (o.merged ?? [['347', 'UI v2 is the default, with a first-run tour', '2h'], ['339', 'New installs default to Opus, 1M context', '5h'], ['336', 'Codex usage meter in the top bar', '1d']])
+    .map(([n, t, w]) => `<div class="mrow">${MERGE}<span class="num">#${n}</span><span>${t}</span><span class="w">${w}</span></div>`).join('');
+  return `<div class="h">Review &amp; merge <span class="n">4 ready</span></div>
+    <div style="position:relative;margin-top:34px">${behind(349, 'feat: Codex usage meter', -34, 0.9, 0.55)}${behind(350, 'feat: Settings, redesigned', -17, 0.95, 0.8)}${top}</div>
+    <div class="h" style="margin:22px 0 0">Merged today</div>
+    <div class="merged-list">${merged}</div>`;
+}
+
+// ---- layout helpers ----
+const world = document.getElementById('world');
+const flat = document.getElementById('flat');
+function place(cls, html, x, y, w, extra = '', parent = world) {
+  const el = document.createElement('div');
+  el.className = cls; el.innerHTML = html;
+  el.style.cssText = `left:${x}px;top:${y}px;${w ? `width:${w}px;` : ''}${extra}`;
+  parent.appendChild(el);
+  return el;
+}
+function addText() {}
+function rectOf(el) { return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }; }
+
+// Wires: a glowing bezier from a to b, with particles riding it.
+const svg = document.getElementById('wires');
+svg.setAttribute('width', 1920); svg.setAttribute('height', 1080);
+svg.innerHTML = `<defs>
+  <linearGradient id="gOut" gradientUnits="userSpaceOnUse" x1="0" x2="1920"><stop offset="0" stop-color="#a78bfa"/><stop offset="0.6" stop-color="#818cf8"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+  <linearGradient id="gIn" gradientUnits="userSpaceOnUse" x1="0" x2="1920"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#34d399"/></linearGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="glowL" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+  <filter id="glowS" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter>
+</defs>`;
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function wire(ax, ay, bx, by, o = {}) {
+  const color = o.color || 'url(#gOut)', op = o.opacity ?? 1;
+  const horiz = o.vertical ? false : true;
+  const k = o.bend ?? 0.5;
+  const d = horiz
+    ? `M${ax},${ay} C${ax + (bx - ax) * k},${ay} ${bx - (bx - ax) * k},${by} ${bx},${by}`
+    : `M${ax},${ay} C${ax},${ay + (by - ay) * k} ${bx},${by - (by - ay) * k} ${bx},${by}`;
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('opacity', op);
+  g.innerHTML = `<path d="${d}" stroke="${color}" stroke-width="7" fill="none" opacity="0.35" filter="url(#glow)"/>
+    <path d="${d}" stroke="${color}" stroke-width="1.6" fill="none" opacity="0.9"/>
+    <path d="${d}" stroke="#fff" stroke-width="0.6" fill="none" opacity="0.35"/>`;
+  svg.appendChild(g);
+  const p = g.querySelector('path');
+  const L = p.getTotalLength();
+  const n = o.particles ?? 3;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.25 + rnd() * 0.5) / n;
+    const pt = p.getPointAtLength(L * t);
+    const pc = o.pcolor || '#e9d5ff';
+    g.insertAdjacentHTML('beforeend', `<circle cx="${pt.x}" cy="${pt.y}" r="7" fill="${pc}" opacity="0.5" filter="url(#glowS)"/><circle cx="${pt.x}" cy="${pt.y}" r="2.2" fill="#fff"/>`);
+  }
+  // end caps
+  g.insertAdjacentHTML('beforeend', `<circle cx="${bx}" cy="${by}" r="3.2" fill="${o.cap || '#c4b5fd'}"/><circle cx="${bx}" cy="${by}" r="9" fill="${o.cap || '#c4b5fd'}" opacity="0.35" filter="url(#glowS)"/>`);
+}
+
+function wordmark(x, y, scale = 1) {
+  place('wordmark', `<span class="logo">${LOGO}</span><span>AgentBox</span>`, x, y, 0, `transform:scale(${scale});transform-origin:0 0`, flat);
+}
+function url(x, y, extra = '') { place('url', `<b>agentbox</b>.linting.dev`, x, y, 0, extra, flat); }
+function text(cls, html, x, y, extra = '') { return place(cls, html, x, y, 0, extra, flat); }
+
+// ---- variants ----
+const layouts = {
+  // One lead → a fan of agents → review & merge, left to right, with a headline.
+  flow() {
+    wordmark(80, 64);
+    text('headline', `One lead.<br><em>Many agents.</em>`, 80, 150, 'font-size:76px');
+    text('sub', `Each agent is a Linux machine of its own, with<br>its branch, terminal and desktop. You review<br>and merge what they ship.`, 82, 336);
+    url(1584, 1016);
+    const lead = place('panel lead', leadHTML(), 80, 456, 520, 'height:560px');
+    const cols = [{ x: 700, ys: [-26, 186, 398, 610, 822], blur: [1, 0, 0, 0, 1] }, { x: 1030, ys: [80, 292, 504, 716, 928], blur: [0, 0, 0, 0, 2] }];
+    const cards = [];
+    let i = 0;
+    for (const c of cols) c.ys.forEach((y, j) => {
+      const a = AGENTS[i++];
+      const el = place('panel agent' + (a.state === 'asking' ? ' asking' : '') + (c.blur[j] === 1 ? ' far' : c.blur[j] === 2 ? ' farther' : ''), agentHTML(a), c.x, y, 300);
+      cards.push({ el, a });
+    });
+    const st = place('stack', stackHTML({ merged: [['347', 'UI v2 is the default, with a first-run tour', '2h'], ['339', 'New installs default to Opus, 1M context', '5h'], ['336', 'Codex usage meter in the top bar', '1d'], ['333', 'Review and merge from your phone', '1d']] }), 1420, 250, 420);
+    const L = rectOf(lead);
+    const ax = L.x + L.w, ay = L.y + 70;
+    for (const { el } of cards) {
+      const r = rectOf(el);
+      const blurred = el.classList.contains('far') || el.classList.contains('farther');
+      wire(ax, ay, r.x, r.y + r.h / 2, { opacity: blurred ? 0.4 : 0.85, particles: 2, bend: 0.55 });
+    }
+    const S = rectOf(st);
+    for (const { el, a } of cards) if (a.state === 'review') {
+      const r = rectOf(el);
+      wire(r.x + r.w, r.y + r.h / 2, S.x, S.y + 210, { color: 'url(#gIn)', cap: '#6ee7b7', pcolor: '#a7f3d0', particles: 2, opacity: 0.85 });
+    }
+  },
+
+  // The same story on a tilted plane, cards floating over glowing traces.
+  plane() {
+    wordmark(80, 64);
+    text('headline', `One lead.<br><em>Many agents.</em>`, 80, 140, 'font-size:68px');
+    url(1584, 1016);
+    world.style.cssText = `width:1920px;height:1080px;transform-origin:50% 50%;transform:translate(${+(params.get('tx') || 50)}px,${+(params.get('ty') || 50)}px) perspective(2400px) rotateX(${+(params.get('rx') || 36)}deg) rotateZ(${+(params.get('rz') || -16)}deg) scale(${+(params.get('sc') || 0.78)})`;
+    const lead = place('panel lead', leadHTML({ more: true }), 0, 170, 500, 'height:700px;transform:translateZ(90px)');
+    const cards = [];
+    let i = 0;
+    const xs = [640, 980, 1320], ys = [-40, 220, 480, 740];
+    for (const y of ys) for (const x of xs) {
+      const a = AGENTS[i++];
+      const el = place('panel agent' + (a.state === 'asking' ? ' asking' : ''), agentHTML(a), x, y, 300, `transform:translateZ(${36 + ((i * 37) % 44)}px)`);
+      cards.push({ el, a });
+    }
+    const st = place('stack', stackHTML({ shot: false }), 1720, 170, 420, 'transform:translateZ(80px)');
+    const L = rectOf(lead);
+    svg.insertAdjacentHTML('beforeend', `<rect x="${L.x - 30}" y="${L.y - 30}" width="${L.w + 60}" height="${L.h + 60}" rx="40" fill="#7c3aed" opacity="0.55" filter="url(#glowL)"/>`);
+    for (const { el } of cards) {
+      const r = rectOf(el);
+      wire(L.x + L.w, L.y + L.h / 2, r.x, r.y + r.h / 2, { opacity: 0.85, particles: 2 });
+      svg.insertAdjacentHTML('beforeend', `<rect x="${r.x + 6}" y="${r.y + 10}" width="${r.w - 12}" height="${r.h - 6}" rx="16" fill="#000" opacity="0.7" filter="url(#glow)"/>`);
+    }
+    const S = rectOf(st);
+    for (const { el, a } of cards) if (a.state === 'review') {
+      const r = rectOf(el);
+      wire(r.x + r.w, r.y + r.h / 2, S.x, S.y + 160, { color: 'url(#gIn)', cap: '#6ee7b7', pcolor: '#a7f3d0', opacity: 0.85 });
+    }
+  },
+
+  // The lead at the centre, agents in a burst around it, PRs falling into the stack below.
+  burst() {
+    wordmark(80, 56);
+    url(1584, 1000);
+    text('headline', `One lead. <em>Many agents.</em>`, 80, 984, 'font-size:40px;letter-spacing:-0.035em');
+    const lead = place('panel lead', leadHTML({ more: true }), 700, 130, 520, 'height:600px');
+    const L = rectOf(lead);
+    const spots = [
+      [50, 120, 'far'], [30, 440, ''], [50, 760, 'far'],
+      [370, 260, ''], [370, 600, ''],
+      [1250, 260, ''], [1250, 600, ''],
+      [1570, 120, 'far'], [1590, 440, ''], [1570, 760, 'far'],
+      [380, -120, 'farther'], [1240, -120, 'farther'],
+    ];
+    const cards = spots.map(([x, y, depth], i) => {
+      const a = AGENTS[i];
+      return { el: place('panel agent' + (a.state === 'asking' ? ' asking' : '') + (depth ? ' ' + depth : ''), agentHTML(a), x, y, 300), a, depth };
+    });
+    const st = place('stack', stackHTML({ shot: false, merged: [] }), 760, 790, 400);
+    st.querySelectorAll('.h')[1].remove();
+    const cx = L.x + L.w / 2, cy = L.y + L.h / 2;
+    svg.insertAdjacentHTML('beforeend', `<circle cx="${cx}" cy="${cy}" r="420" fill="#7c3aed" opacity="0.4" filter="url(#glowL)"/>`);
+    for (const { el, depth } of cards) {
+      const r = rectOf(el);
+      wire(cx, cy, r.x + r.w / 2, r.y + r.h / 2, { opacity: depth === 'farther' ? 0.35 : depth ? 0.6 : 0.95, particles: 4, bend: 0.3 });
+    }
+    const S = rectOf(st);
+    for (const { el, a } of cards) if (a.state === 'review') {
+      const r = rectOf(el);
+      const left = r.x < L.x;
+      wire(r.x + r.w / 2, r.y + r.h, left ? S.x : S.x + S.w, S.y + 120, { vertical: true, color: 'url(#gIn)', cap: '#6ee7b7', pcolor: '#a7f3d0', opacity: 0.85 });
+    }
+  },
+};
+layouts[V]();
+
+// Film grain, seeded so every render is the same.
+(() => {
+  const c = document.getElementById('grain'), x = c.getContext('2d'), img = x.createImageData(1920, 1080);
+  let s = 12345;
+  for (let i = 0; i < img.data.length; i += 4) { s = (s * 16807) % 2147483647; const v = (s & 255); img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  x.putImageData(img, 0, 0);
+})();
+
+// ?og=1: a 1200×630 frame of the same scene, scaled and centred on ?ox,?oy.
+if (params.get('og')) {
+  document.body.classList.add('og');
+  const s = +(params.get('s') || 0.625), ox = +(params.get('ox') || 960), oy = +(params.get('oy') || 540);
+  document.getElementById('stage').style.transform = `translate(${600 - ox * s}px, ${315 - oy * s}px) scale(${s})`;
+}
+document.fonts.ready.then(() => document.body.setAttribute('data-ready', '1'));
+</script>
+</body>
+</html>
