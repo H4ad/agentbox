@@ -149,6 +149,9 @@
 //                           dev bridge (fixtures.ts)
 //   ?power=wsl-running|wsl-off
 //                           the same on Windows, for AgentBox's WSL distro
+//   ?concept=wall           a mock, not the app: a live wall of a lead's agents'
+//                           desktops above its chat, and their thumbnails in the
+//                           sidebar's rows (dev/concepts/wall.tsx has its params)
 //   ?app=home|project|pulls|agent-99|settings
 //                           the whole App, sidebar, top bar, page and rail, as
 //                           the window shows it, open on Home, the project's
@@ -1282,6 +1285,9 @@ if (phoneMode === 'frame') {
       </TooltipProvider>
     </QueryClientProvider>,
   );
+} else if (params.get('concept') === 'wall') {
+  const { WallConcept } = await import('./concepts/wall');
+  createRoot(document.getElementById('root')!).render(<WallConcept />);
 } else if (appView) {
   const { App } = await import('../App');
   const initial: View =
