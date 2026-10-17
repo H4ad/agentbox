@@ -13,7 +13,8 @@ import { inScope, type MediaScope } from '../lib/mediaPages';
 import { pagePageUrl, pageRequest, pageThumbUrl } from './pages';
 import { pastRequest } from './pastAgents';
 
-export const PROJECT = 'agentbox';
+// ?promo (dev/promo.ts) films a made-up shop, FreshCart, rather than AgentBox.
+export const PROJECT = typeof location !== 'undefined' && new URLSearchParams(location.search).has('promo') ? 'freshcart' : 'agentbox';
 
 export const WIDE = {
   longPath: '/home/user/.local/share/agentbox/worktrees/agentbox/agent-96/desktop/src/renderer/components/chat/Markdown.tsx',
@@ -583,6 +584,11 @@ export function mediaItems(count = 360): T.MediaItem[] {
 }
 
 // seedMedia gives the project, and agent-99, the gallery mediaItems makes.
+// setDevMedia is the gallery GET /v1/media answers from (dev/promo.ts).
+export function setDevMedia(items: T.MediaItem[]): void {
+  devState.media = items;
+}
+
 export function seedMedia(queryClient: QueryClient): void {
   devState.media = mediaItems();
   queryClient.setQueryData(['media', `${PROJECT}/agent-99`], devState.media.filter((m) => m.agentName === 'agent-99'));

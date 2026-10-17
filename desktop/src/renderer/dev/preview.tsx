@@ -212,6 +212,7 @@
 // See scenarios.json for the set scripts/preview.mjs captures.
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
+import '@xterm/xterm/css/xterm.css';
 import '../styles.css';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -266,9 +267,12 @@ import { ScopedMediaPages } from '../components/pages/MediaPages';
 import { mockMedia, NotificationsPreview, seedNotifications } from './notifications';
 import { ReviewPreview, seedLeadLines, seedReview, seedV2 } from './review';
 import { setUiV2 } from '../lib/uiV2';
+import { installPromoBridge, seedPromo } from './promo';
 import { setTourState, tours, welcomeTour } from '../lib/tours';
 
 installDevBridge();
+const promo = new URLSearchParams(location.search).get('promo'); // dev/promo.ts: spawn | work | review
+if (promo) installPromoBridge();
 
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.appearance = params.get('theme') === 'light' ? 'light' : '';
@@ -578,6 +582,7 @@ seedConnection(
       : { state: 'connected' },
 );
 const seededRun = power && free ? freeRun(queryClient, free) : undefined;
+if (promo) seedPromo(queryClient, promo);
 
 if (io) {
   const GiB = 1024 ** 3;
