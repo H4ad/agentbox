@@ -273,6 +273,7 @@ import { ScopedMediaPages } from '../components/pages/MediaPages';
 
 import { mockMedia, NotificationsPreview, seedNotifications } from './notifications';
 import { ReviewPreview, seedEvidence, seedLeadLines, seedReview, seedV2 } from './review';
+import { PipFinish, seedPip } from './pip';
 import { seedTimelines } from './timeline';
 import { setUiV2 } from '../lib/uiV2';
 import { setTourState, tours, welcomeTour } from '../lib/tours';
@@ -468,6 +469,8 @@ if (appView && params.get('v2') === '1') {
   // its picker the past agents.
   if (!media) seedMedia(queryClient);
   if (!past) seedPastAgents(queryClient);
+  // &pip=1: the lead's picture-in-picture desktops, with agents at work (dev/pip.tsx).
+  if (params.get('pip') === '1') seedPip(queryClient);
   // Each page starts with no panel open, whatever the last one left.
   setPanel({ chats: {} });
   const tabs = params.get('panel');
@@ -1313,6 +1316,7 @@ if (phoneMode === 'frame') {
       <TooltipProvider delayDuration={250}>
         <App initial={initial} />
         <Toasts />
+        {params.get('pip') === '1' && <PipFinish />}
       </TooltipProvider>
     </QueryClientProvider>,
   );
