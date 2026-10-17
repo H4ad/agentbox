@@ -97,6 +97,11 @@ func finishNotice(ev api.AgentEvent) string {
 // not the app hears about it.
 func (s *Server) record(ctx context.Context, ev api.AgentEvent) api.AgentEvent {
 	ev.ID = newID()
+	// The table orders events by the millisecond (then by insertion), so the
+	// time the app is sent is that millisecond too: a finish stamped with
+	// time.Now() would otherwise read as newer than a question, stamped with
+	// its row's millisecond, that was recorded after it.
+	ev.At = ev.At.Truncate(time.Millisecond)
 	data, err := json.Marshal(ev)
 	if err != nil {
 		s.logf("recording what %s did: %v", ev.Ref, err)
