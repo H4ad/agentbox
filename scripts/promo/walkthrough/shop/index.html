@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FreshCart — Dashboard</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --text:#141824; --muted:#667085; --line:#e6e8ef; --brand:#16a34a; --brand2:#22c55e; --accent:#f59e0b; --chip:#eef2ff; }
+  .dark { --bg:#0b0f17; --card:#121826; --text:#e8ecf4; --muted:#8b95a7; --line:#1f2737; --chip:#1b2335; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: Inter, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); transition: background .5s, color .5s; }
+  .app { display:grid; grid-template-columns: 232px 1fr; min-height:100vh; }
+  aside { background:var(--card); border-right:1px solid var(--line); padding:22px 16px; transition: background .5s; }
+  .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; margin-bottom:28px; }
+  .logo i { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,var(--brand2),#0ea5e9); display:grid; place-items:center; color:#fff; font-style:normal; }
+  nav a { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; color:var(--muted); text-decoration:none; font-weight:500; font-size:14.5px; margin-bottom:2px; }
+  nav a.on { background:var(--chip); color:var(--text); }
+  main { padding:28px 34px; }
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+  h1 { margin:0; font-size:26px; letter-spacing:-.02em; }
+  .sub { color:var(--muted); font-size:14px; margin-top:4px; }
+  .btn { border:1px solid var(--line); background:var(--card); color:var(--text); padding:10px 16px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; }
+  .btn.pri { background:var(--brand); color:#fff; border-color:transparent; }
+  .toggle { width:46px; height:26px; border-radius:99px; background:#d0d5dd; position:relative; transition:.3s; }
+  .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.3s; }
+  .dark .toggle { background:var(--brand); } .dark .toggle::after { left:23px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px; transition: background .5s, border-color .5s; }
+  .kpi .l { color:var(--muted); font-size:13px; } .kpi .v { font-size:26px; font-weight:750; margin-top:6px; letter-spacing:-.02em; } .kpi .d { color:var(--brand); font-size:13px; margin-top:4px; font-weight:600; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; color:var(--muted); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; padding:10px 12px; border-bottom:1px solid var(--line); }
+  td { padding:13px 12px; border-bottom:1px solid var(--line); }
+  .pill { padding:4px 10px; border-radius:99px; font-size:12.5px; font-weight:600; }
+  .ok { background:#dcfce7; color:#166534; } .wait { background:#fef3c7; color:#92400e; } .ship { background:#dbeafe; color:#1e40af; }
+  .dark .ok { background:#12351f; color:#86efac; } .dark .wait { background:#3a2a0b; color:#fcd34d; } .dark .ship { background:#172554; color:#93c5fd; }
+  .toast { position:fixed; right:28px; bottom:28px; background:#111827; color:#fff; padding:14px 18px; border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.25); display:flex; gap:12px; align-items:center; font-size:14px; transform:translateY(140%); opacity:0; transition:.4s; }
+  .toast.show { transform:none; opacity:1; }
+  .center { min-height:100vh; display:grid; place-items:center; background:radial-gradient(circle at 30% 20%, #dcfce7, transparent 40%), radial-gradient(circle at 80% 80%, #e0f2fe, transparent 40%), var(--bg); }
+  .login { width:400px; padding:34px; }
+  .login h2 { margin:0 0 6px; font-size:24px; }
+  input { width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--line); font-size:14.5px; margin:8px 0; background:var(--card); color:var(--text); }
+  .gbtn { width:100%; justify-content:center; padding:12px; margin-top:6px; }
+  .grid2 { display:grid; grid-template-columns: 1.3fr 1fr; gap:18px; }
+  .qr { width:220px; height:220px; margin:10px auto; background:
+      conic-gradient(from 90deg at 12% 12%, #111 25%, transparent 0) 0 0/22px 22px,
+      repeating-linear-gradient(45deg,#111 0 6px,#fff 6px 12px); border:10px solid #fff; outline:1px solid var(--line); border-radius:8px; }
+  .coupon { display:flex; justify-content:space-between; align-items:center; padding:16px; border:1.5px dashed var(--line); border-radius:14px; margin-bottom:12px; }
+  .code { font-family: "JetBrains Mono", monospace; font-weight:700; background:var(--chip); padding:6px 10px; border-radius:8px; }
+  .bar { height:120px; display:flex; align-items:flex-end; gap:10px; padding-top:10px; }
+  .bar div { flex:1; background:linear-gradient(180deg,var(--brand2),var(--brand)); border-radius:6px 6px 2px 2px; opacity:.9; }
+  .hide { display:none !important; }
+  .spin { width:16px; height:16px; border:2px solid #fff6; border-top-color:#fff; border-radius:50%; animation:s 0.8s linear infinite; } @keyframes s { to { transform: rotate(360deg);} }
+</style>
+</head>
+<body>
+<div id="dash" class="app">
+  <aside>
+    <div class="logo"><i>🧺</i> FreshCart</div>
+    <nav>
+      <a href="#orders" data-nav="orders">📦 Orders</a>
+      <a href="#produtos">🥬 Products</a>
+      <a href="#discounts" data-nav="discounts">🏷️ Discounts</a>
+      <a href="#checkout" data-nav="checkout">💳 Checkout</a>
+      <a href="#clientes">👥 Customers</a>
+      <a href="#relatorios">📈 Reports</a>
+    </nav>
+  </aside>
+  <main>
+    <section id="v-orders">
+      <header>
+        <div><h1>Orders</h1><div class="sub">Today, October 17 · 128 orders</div></div>
+        <div style="display:flex; gap:10px; align-items:center">
+          <span class="sub" style="margin:0">Dark mode</span><div class="toggle" id="darkToggle" onclick="toggleDark()"></div>
+          <button class="btn" id="csvBtn" onclick="exportCsv()">⬇️ Export CSV</button>
+          <button class="btn pri">+ New order</button>
+        </div>
+      </header>
+      <div class="kpis">
+        <div class="card kpi"><div class="l">Revenue</div><div class="v">$18,420</div><div class="d">▲ 12.4% vs. yesterday</div></div>
+        <div class="card kpi"><div class="l">Orders</div><div class="v">128</div><div class="d">▲ 8.1%</div></div>
+        <div class="card kpi"><div class="l">Average order</div><div class="v">$143.90</div><div class="d">▲ 3.9%</div></div>
+        <div class="card kpi"><div class="l">Paid with Apple Pay</div><div class="v">71%</div><div class="d">▲ 5 pts</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <table>
+            <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div style="font-weight:700">Sales by hour</div>
+          <div class="sub">Peak at noon</div>
+          <div class="bar" id="bars"></div>
+          <div style="margin-top:22px; font-weight:700">Best sellers</div>
+          <div class="sub" style="line-height:2">🍅 Organic tomatoes · 🥑 Avocados · 🍌 Bananas · 🧀 Fresh cheese</div>
+        </div>
+      </div>
+    </section>
+    <section id="v-discounts" class="hide">
+      <header><div><h1>Discount codes</h1><div class="sub">4 active · 1,204 uses this month</div></div><button class="btn pri">+ New code</button></header>
+      <div class="grid2"><div>
+        <div class="card coupon"><div><b>First order</b><div class="sub">15% off orders over $80</div></div><span class="code">WELCOME15</span></div>
+        <div class="card coupon"><div><b>Free shipping</b><div class="sub">Orders over $120</div></div><span class="code">FREESHIP</span></div>
+        <div class="card coupon"><div><b>Organic week</b><div class="sub">10% off organic produce</div></div><span class="code">ORGANIC10</span></div>
+        <div class="card coupon"><div><b>Apple Pay</b><div class="sub">5% extra off with Apple Pay</div></div><span class="code">APPLEPAY5</span></div>
+      </div><div class="card"><b>Uses per code</b><div class="bar" id="bars2"></div></div></div>
+    </section>
+    <section id="v-checkout" class="hide">
+      <header><div><h1>Checkout</h1><div class="sub">Order #4821 · Emma Johnson</div></div></header>
+      <div class="grid2">
+        <div class="card"><table><tbody>
+          <tr><td>🍅 Organic tomatoes (2 lb)</td><td>$23.80</td></tr><tr><td>🥑 Avocados (3)</td><td>$14.70</td></tr>
+          <tr><td>🧀 Fresh cheese</td><td>$32.90</td></tr><tr><td>🍌 Bananas (1 dozen)</td><td>$9.90</td></tr>
+          <tr><td><b>Total</b></td><td><b>$81.30</b></td></tr></tbody></table></div>
+        <div class="card" style="text-align:center"><b>Pay with Apple Pay</b><div class="sub">Scan the code with your iPhone</div><div class="qr"></div>
+          <div id="pixStatus" class="pill wait" style="display:inline-block">Waiting for payment…</div></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="login" class="center hide">
+  <div class="card login">
+    <div class="logo" style="justify-content:center"><i>🧺</i> FreshCart</div>
+    <h2>Sign in</h2><div class="sub" style="margin-bottom:14px">Sign in to your store dashboard</div>
+    <input placeholder="Email" value="store@freshcart.demo"><input placeholder="Password" type="password" value="........">
+    <button class="btn pri gbtn">Sign in</button>
+    <button class="btn gbtn" id="gbtn" onclick="google()"><b style="color:#4285F4">G</b> Continue with Google</button>
+    <div id="gok" class="pill ok hide" style="display:block; text-align:center; margin-top:12px">✓ Google sign-in works on Safari</div>
+  </div>
+</div>
+<div class="toast" id="toast"><span>✅</span><div><b>orders-2026-10-17.csv</b><div style="opacity:.7; font-size:13px">128 orders exported</div></div></div>
+<script>
+  const names = ['Emma Johnson','Liam Smith','Olivia Brown','Noah Davis','Ava Wilson','Lucas Miller','Mia Taylor','Ethan Moore','Sofia Clark'];
+  const st = [['Paid','ok'],['Shipped','ship'],['Awaiting payment','wait']];
+  document.getElementById('rows').innerHTML = names.map((n,i)=>`<tr><td>#${4821-i}</td><td>${n}</td><td>${3+(i*7)%9}</td><td>$${(81.3+i*23.7).toFixed(2)}</td><td><span class="pill ${st[i%3][1]}">${st[i%3][0]}</span></td></tr>`).join('');
+  const h=[20,35,50,80,100,70,60,85,55,40,30]; document.getElementById('bars').innerHTML = h.map(x=>`<div style="height:${x}%"></div>`).join('');
+  document.getElementById('bars2').innerHTML = [90,45,60,75].map(x=>`<div style="height:${x}%"></div>`).join('');
+  function toggleDark(){ document.body.classList.toggle('dark'); }
+  function exportCsv(){ const b=document.getElementById('csvBtn'); b.innerHTML='<span class="spin" style="border-color:#0003;border-top-color:#333"></span> Exporting…'; setTimeout(()=>{ b.innerHTML='⬇️ Export CSV'; document.getElementById('toast').classList.add('show'); },900); }
+  function google(){ const b=document.getElementById('gbtn'); b.innerHTML='<span class="spin" style="border-color:#0003;border-top-color:#333"></span> Connecting…'; setTimeout(()=>{ b.innerHTML='<b style="color:#4285F4">G</b> Signed in as store@freshcart.demo'; document.getElementById('gok').classList.remove('hide'); },1100); }
+  function route(){
+    const h = (location.hash||'#orders').slice(1);
+    const [view, ...flags] = h.split('+');
+    document.getElementById('login').classList.toggle('hide', view!=='login');
+    document.getElementById('dash').classList.toggle('hide', view==='login');
+    for (const v of ['orders','discounts','checkout']) document.getElementById('v-'+v).classList.toggle('hide', v!==view);
+    document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('on', a.dataset.nav===view));
+    if (flags.includes('dark')) document.body.classList.add('dark');
+    if (flags.includes('toast')) document.getElementById('toast').classList.add('show');
+    if (flags.includes('paid')) { const p=document.getElementById('pixStatus'); p.className='pill ok'; p.textContent='✓ Payment confirmed'; p.style.display='inline-block'; }
+  }
+  addEventListener('hashchange', route); route();
+</script>
+</body>
+</html>
