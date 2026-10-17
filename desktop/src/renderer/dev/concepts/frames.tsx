@@ -176,6 +176,7 @@ function along(
   per = 1.6,
 ): { x: number; y: number; click: boolean } {
   const n = points.length;
+  t = Math.max(0, t);
   const k = Math.floor(t / per) % n;
   const f = (t % per) / per;
   const e = f < 0.6 ? 1 - Math.pow(1 - f / 0.6, 3) : 1;

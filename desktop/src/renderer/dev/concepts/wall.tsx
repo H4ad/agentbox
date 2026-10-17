@@ -921,7 +921,7 @@ function FullScreen({
     setPlayFrom(performance.now() / 1000);
   };
   const played =
-    sel?.kind === "video" ? Math.min(sel.secs!, (t - playFrom) * 1) : 0;
+    sel?.kind === "video" ? Math.min(sel.secs!, Math.max(0, t - playFrom)) : 0;
   const frameT = !sel
     ? t + a.seed
     : sel.kind === "video"
