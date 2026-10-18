@@ -18,7 +18,7 @@ import type { MessageKey } from './i18n';
 import type { Arrival } from './uiV2.ts';
 
 // Example is the made-up content a step shows beside its words.
-export type Example = 'sidebar' | 'prompt' | 'mention' | 'cards' | 'review' | 'panel' | 'layout' | 'pick';
+export type Example = 'sidebar' | 'prompt' | 'mention' | 'cards' | 'review' | 'panel' | 'layout' | 'notes' | 'pick';
 
 // Go is where a step needs the app to be: a lead's chat, or that chat with its
 // panel open. Without a project, the step stays where it is.
@@ -160,6 +160,14 @@ const S = {
     example: 'layout',
     exampleAlways: true,
   },
+  diffNotes: {
+    id: 'diff-notes',
+    title: 'tour.diffNotes.title',
+    body: 'tour.diffNotes.body',
+    anchor: ['[data-review-note-add]', '[data-v2-review-button]', '[data-v2-review-banner]', '[data-v2-review-all]'],
+    example: 'notes',
+    exampleAlways: true,
+  },
   fanOut: {
     id: 'fan-out',
     title: 'tour.fanOut.title',
@@ -213,6 +221,7 @@ export const tours: Tour[] = [
   { id: 'compare', version: v015, title: 'tour.compareTour.name', steps: [S.fanOut, S.compare] },
   { id: 'pick', version: v015, title: 'tour.pickTour.name', steps: [S.pick] },
   { id: 'schedules', version: v015, title: 'tour.schedulesTour.name', steps: [S.schedules] },
+  { id: 'diff-notes', version: v015, title: 'tour.diffNotes.name', steps: [S.diffNotes] },
 ];
 
 export const tourById = (id: string): Tour | undefined => (id === welcomeTour.id ? welcomeTour : tours.find((t) => t.id === id));

@@ -1287,6 +1287,27 @@ var migrations = []string{
 		PRIMARY KEY (group_id, position)
 	)`,
 	`CREATE INDEX agent_group_members_agent ON agent_group_members (project, agent)`,
+	// Notes on an agent's diff from the review (reviewnotes.go): kept here
+	// until Request changes sends them, so closing the review loses none, and
+	// after, as what was asked of the agent. sent_at is 0 while a draft;
+	// sent_hash is the file's content hash as it was sent, which tells
+	// whether a note on removed lines has been seen to since.
+	`CREATE TABLE review_notes (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		project     TEXT NOT NULL,
+		agent       TEXT NOT NULL,
+		path        TEXT NOT NULL,
+		side        TEXT NOT NULL,
+		start_line  INTEGER NOT NULL,
+		end_line    INTEGER NOT NULL,
+		code        TEXT NOT NULL DEFAULT '',
+		body        TEXT NOT NULL,
+		created_at  INTEGER NOT NULL,
+		sent_at     INTEGER NOT NULL DEFAULT 0,
+		sent_hash   TEXT NOT NULL DEFAULT '',
+		resolved_at INTEGER NOT NULL DEFAULT 0
+	)`,
+	`CREATE INDEX review_notes_agent ON review_notes (project, agent)`,
 }
 
 // DefaultMediaRetentionDays is what projects.media_retention_days reads as
@@ -1918,6 +1939,7 @@ var projectOwned = []string{
 	"agent_queue",
 	"agent_events",
 	"agent_reviews",
+	"review_notes",
 	"checkpoints",
 	"questions",
 	"notifications",
@@ -2747,6 +2769,9 @@ func (s *Store) RemoveAgent(ctx context.Context, project, name string) error {
 		return err
 	}
 	if err := s.removeAgentReview(ctx, project, name); err != nil {
+		return err
+	}
+	if err := s.removeReviewNotes(ctx, project, name); err != nil {
 		return err
 	}
 	if err := s.removeCheckpoints(ctx, project, name); err != nil {
