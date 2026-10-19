@@ -47,3 +47,4 @@ test('the remark plugin links names in text, not in code or links', () => {
     [`link:${mentionHref('agent-12')}`, 'text= finished; ask ', `link:${mentionHref('agent-9')}`, 'inlineCode=agent-12', 'link:x'],
   );
 });
+

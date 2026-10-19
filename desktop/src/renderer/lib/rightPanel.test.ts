@@ -38,7 +38,8 @@ test('the lead and a past agent have files and evidence, but no machine views, a
   assert.deepEqual(P.panelViews.filter(P.projectWide), ['pulls', 'schedules', 'settings']);
   // The switch's four, and the ⋯'s the rest: every view is in one of them.
   assert.deepEqual(P.switchViews, ['desktop', 'terminal', 'files', 'evidence']);
-  assert.deepEqual([...P.switchViews, ...P.moreViews].toSorted(), [...P.panelViews].toSorted());
+  // Pull requests and Settings open from the project's header, not the ⋯.
+  assert.deepEqual([...P.switchViews, ...P.moreViews, 'pulls', 'settings'].toSorted(), [...P.panelViews].toSorted());
   // What each opens on before it was shown in any.
   assert.equal(P.defaultView(live), 'desktop');
   assert.equal(P.defaultView(lead), 'files');
@@ -51,16 +52,6 @@ test('the picker lists the project’s agents with a machine, newest first', () 
     P.pickable('pawly', agents).map((a) => a.name),
     ['new', 'old'],
   );
-});
-
-test('the agent active last is one at work, then the one that did something last, then the newest', () => {
-  const agents = [agent('a', 'running', '2026-10-01T00:00:00Z'), agent('b', 'running', '2026-10-05T00:00:00Z'), agent('c', 'stopped', '2026-10-03T00:00:00Z')];
-  assert.equal(P.mostRecent('pawly', agents)?.name, 'b');
-  assert.equal(P.mostRecent('pawly', agents, [{ ref: 'pawly/a', lastActive: '2026-10-09T00:00:00Z' }])?.name, 'a');
-  assert.equal(P.mostRecent('pawly', agents, [{ ref: 'pawly/a', lastActive: '2026-10-09T00:00:00Z' }, { ref: 'pawly/c', busy: true, lastActive: '2026-10-02T00:00:00Z' }])?.name, 'c');
-  assert.equal(P.mostRecent('other', agents), undefined);
-  // One using its desktop now goes before them all, as the lane shows it.
-  assert.equal(P.mostRecent('pawly', agents, [{ ref: 'pawly/c', busy: true }], ['pawly/a'])?.name, 'a');
 });
 
 test('an agent’s computer is live while its desktop is used, on, or asleep once it finished', () => {
@@ -76,20 +67,20 @@ test('beside a lead’s chat the panel keeps its one width; beside an agent’s 
   assert.equal(P.panelWant({ width: 560, agentWidth: 700 }, 'pawly/agent-2', 1600), 700);
 });
 
-test('an agent’s chat shows its own agent until another is picked; the lead’s shows the project’s last', () => {
+test('an agent’s chat shows its own agent until another is picked; the lead’s shows what was picked in it, else its list', () => {
   P.setPanel({ chats: {}, views: {}, last: {} });
   const lead = 'pawly/lead';
   const chat = 'pawly/agent-2';
   assert.equal(P.chatPanel(P.panelState(), chat).open, false);
   assert.equal(P.panelTarget(P.panelState(), chat), chat);
-  // Nothing picked yet: RightPanel falls back on the agent active last.
+  // Nothing picked yet: the lead's shows the list.
   assert.equal(P.panelTarget(P.panelState(), lead), undefined);
 
   P.pickTarget(chat, 'pawly/agent-3');
   assert.equal(P.panelTarget(P.panelState(), chat), 'pawly/agent-3');
   assert.equal(P.chatPanel(P.panelState(), chat).open, true);
-  // What was looked at last is what the lead's opens on.
-  assert.equal(P.panelTarget(P.panelState(), lead), 'pawly/agent-3');
+  // The lead's keeps its own: its list, until something is picked there.
+  assert.equal(P.panelTarget(P.panelState(), lead), undefined);
   P.pickTarget(lead, 'pawly/lead');
   assert.equal(P.panelTarget(P.panelState(), lead), 'pawly/lead');
   assert.equal(P.chatPanel(P.panelState(), lead).target, undefined);
@@ -117,13 +108,12 @@ test('each agent keeps the view it was last shown in; the project’s own views 
   P.openPanelOn(lead, 'pulls');
   assert.equal(P.chatPanel(P.panelState(), lead).wide, 'pulls');
   assert.equal(P.viewOf(P.panelState(), two), 'terminal');
-  assert.equal(P.shown(P.panelState(), lead), undefined);
+  assert.equal(P.onList(P.panelState(), lead), false);
   // A view of the switch, or another agent, leaves it.
   P.pickTarget(lead, 'pawly/agent-2');
   assert.equal(P.chatPanel(P.panelState(), lead).wide, undefined);
-  assert.deepEqual(P.shown(P.panelState(), lead), { target: 'pawly/agent-2', view: 'terminal' });
-  P.setPanelOpen(lead, false);
-  assert.equal(P.shown(P.panelState(), lead), undefined);
+  assert.equal(P.panelTarget(P.panelState(), lead), 'pawly/agent-2');
+  assert.equal(P.panelState().views['pawly/agent-2'], 'terminal');
 });
 
 test('opening an agent’s chat opens its panel on its Desktop, where it fits beside the chat', () => {
@@ -137,7 +127,8 @@ test('opening an agent’s chat opens its panel on its Desktop, where it fits be
   P.openAgentChat('pawly/agent-2');
   assert.deepEqual(P.chatPanel(P.panelState(), 'pawly/agent-2'), { open: true, target: 'pawly/agent-2' });
   assert.equal(P.panelState().views['pawly/agent-2'], 'desktop');
-  assert.equal(P.panelState().last.pawly, 'pawly/agent-2');
+  // The lead's panel keeps its own: back there, it shows what it showed.
+  assert.equal(P.panelState().last.pawly, undefined);
 });
 
 test('the panel is remembered, but not what Evidence was opened on; a panel saved with tabs opens again', async () => {
@@ -224,4 +215,67 @@ test('the Browser view offers the ports the agent’s Chromium has open, through
   );
   assert.equal(P.previewUrl({ name: 'agent-2', project: 'pawly' }, '5173', '127.0.0.1:7777', '/preview.html'), 'http://5173.agent-2.pawly.localhost:7777/preview.html');
   assert.equal(P.previewUrl({ name: 'agent-2', project: 'pawly' }, '3000', ':7777'), 'http://3000.agent-2.pawly.localhost:7777/');
+});
+
+test('the back arrow leaves the project’s own view first, then goes to the list', () => {
+  P.setPanel({ chats: {}, views: {}, last: {} });
+  const lead = 'pawly/lead';
+  const chat = 'pawly/agent-2';
+  P.openPanelOn(lead, 'desktop', 'pawly/agent-3');
+  P.openPanelOn(lead, 'settings');
+  P.panelBack(lead);
+  assert.equal(P.chatPanel(P.panelState(), lead).wide, undefined);
+  assert.equal(P.panelTarget(P.panelState(), lead), 'pawly/agent-3');
+  P.panelBack(lead);
+  assert.equal(P.panelTarget(P.panelState(), lead), undefined);
+  assert.equal(P.chatPanel(P.panelState(), lead).open, true);
+  assert.equal(P.onList(P.panelState(), lead), true);
+  // An agent's chat shows itself until its back arrow; opening its chat again shows it again.
+  P.panelBack(chat);
+  assert.equal(P.panelTarget(P.panelState(), chat), undefined);
+  P.setFitsBeside(true);
+  P.openAgentChat(chat);
+  assert.equal(P.panelTarget(P.panelState(), chat), chat);
+});
+
+test('the list is narrow, as dragged while the chat keeps its least, and folds to a strip', () => {
+  assert.deepEqual(P.listBox({}, 1600, 1900), { width: P.listDefault, drawer: false });
+  assert.deepEqual(P.listBox({ listWidth: 900 }, 1000, 1300), { width: 1000 - P.chatMin, drawer: false });
+  assert.deepEqual(P.listBox({ listWidth: 100 }, 1600, 1900), { width: P.listMin, drawer: false });
+  assert.deepEqual(P.listBox({ listFolded: true }, 1600, 1900), { width: P.listStrip, drawer: false });
+  // Below besideMin, a drawer, as the panel is.
+  assert.equal(P.listBox({}, 900, 1000).drawer, true);
+});
+
+test('✕ goes back to the list; the panel button folds the list and back, and never closes it', () => {
+  P.setPanel({ chats: {}, views: {}, last: {}, listFolded: false });
+  P.setFitsBeside(true);
+  const lead = 'pawly/lead';
+  P.pickTarget(lead, lead);
+  P.panelClose(lead);
+  assert.equal(P.onList(P.panelState(), lead), true);
+  P.openPanelOn(lead, 'settings');
+  P.panelClose(lead);
+  assert.equal(P.onList(P.panelState(), lead), true);
+  // An agent's chat goes back to its list too.
+  P.openAgentChat('pawly/agent-2');
+  P.panelClose('pawly/agent-2');
+  assert.equal(P.onList(P.panelState(), 'pawly/agent-2'), true);
+  // The button and ⌘D: from an agent, to the list; on the list, fold and back.
+  P.openPanelOn(lead, 'files', 'pawly/agent-3');
+  P.panelToggle(lead);
+  assert.equal(P.onList(P.panelState(), lead), true);
+  assert.equal(P.panelState().listFolded, false);
+  P.panelToggle(lead);
+  assert.equal(P.panelState().listFolded, true);
+  P.panelToggle(lead);
+  assert.equal(P.panelState().listFolded, false);
+  // Where it doesn't fit beside the chat, it opens and closes the drawer over the strip.
+  P.setFitsBeside(false);
+  P.setPanelOpen(lead, false);
+  P.panelToggle(lead);
+  assert.equal(P.chatPanel(P.panelState(), lead).open, true);
+  P.panelToggle(lead);
+  assert.equal(P.chatPanel(P.panelState(), lead).open, false);
+  P.setFitsBeside(true);
 });

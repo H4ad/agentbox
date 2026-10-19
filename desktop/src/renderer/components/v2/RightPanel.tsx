@@ -1,16 +1,20 @@
-// UI v2's right-hand panel: closed by default, opened from one button in the
-// chat's header (PanelButton) or ⌘D, it shows what an agent has besides its
-// chat. Its header, left to right: whose it shows (an agent with a machine,
-// or the repository, the lead's checkout), a fixed switch of four views,
-// Desktop, Terminal, Files and Evidence, then ⋯ for Browser, Timeline and the
-// project's Pull requests and Settings, and ✕. There are no tabs and nothing
-// to choose first: it always shows something, the view each agent was last
-// shown in. Opening an agent's chat opens it on that agent's Desktop; the
-// lead's opens on the agent it last showed, else the one active last.
-// One width, dragged at its left edge. lib/rightPanel.ts has its rules and
-// state.
+// UI v2's right-hand panel, always beside a chat, as v1's rail was. Its home
+// is the project's agents (AgentList), which fold to a strip of their
+// avatars (») and back from the chat header's button (PanelButton) or ⌘D;
+// it never closes. Where the list doesn't fit beside the chat, the strip
+// stays there and the rest opens over the chat as a drawer.
+// The repository (the lead's checkout), an agent, or the project's Pull
+// requests and Settings (opened from the project's header) show in it with
+// ✕ back to the list; for whose it shows, the header is, left to right: a
+// back arrow, whose it is (a click opens its chat), a fixed switch of four
+// views, Desktop, Terminal, Files and Evidence, then ⋯ for Browser,
+// Timeline and Schedules. Opening an agent's chat (a row of the list does)
+// shows that agent's Desktop, and its back arrow goes back to the lead's
+// chat; the lead's panel keeps what it showed, its list unless something
+// was picked there. Dragged at its left edge, the list and an agent each
+// keep their own width. lib/rightPanel.ts has its rules and state.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlarmClock, Camera, Check, ChevronDown, Crown, Ellipsis, Film, FileText, FolderTree, GanttChart, GitBranch, GitPullRequest, Globe, Image as ImageIcon, Images, LoaderCircle, Maximize, Minimize, Monitor, MousePointer2, Play, Power, Search, SlidersHorizontal, SquareTerminal, Unplug, X, type LucideIcon } from 'lucide-react';
+import { AlarmClock, ArrowLeft, ChevronsRight, Camera, Check, Crown, Ellipsis, Film, FileText, FolderTree, GanttChart, GitBranch, GitPullRequest, Globe, Image as ImageIcon, Images, LoaderCircle, Maximize, Minimize, Monitor, MousePointer2, Play, Plus, Power, SlidersHorizontal, SquareTerminal, Unplug, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type * as T from '../../../shared/api';
@@ -27,23 +31,26 @@ import { projectLabel } from '../../lib/projectName';
 import {
   chaptersOf,
   chatPanel,
-  deskOf,
   hasView,
   isPastRef,
   leadOf,
+  listTarget,
+  listBox,
+  listMin,
+  listStrip,
   machineOf,
   moreViews,
-  mostRecent,
   needsMachine,
   openPanelOn,
+  panelBack,
+  panelClose,
+  panelToggle,
+  onList,
   panelBox,
   panelDefault,
   panelMin,
-  panelState,
   panelTarget,
   panelWant,
-  pickTarget,
-  pickable,
   projectWide,
   resolveWhose,
   setFitsBeside,
@@ -55,14 +62,13 @@ import {
   usePanel,
   viewOf,
   whoseRef,
-  type Desk,
   type PanelState,
   type PanelView,
   type Whose,
 } from '../../lib/rightPanel';
 import { useFullscreen } from '../../lib/useFullscreen';
 import { useVncView } from '../../lib/useVncView';
-import { cn, errorMessage, shortcut, timeAgo } from '../../lib/utils';
+import { cn, errorMessage, timeAgo } from '../../lib/utils';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { FileBrowser } from '../files/FilePanel';
@@ -70,25 +76,19 @@ import { MediaViewer, MoreMedia } from '../MediaTab';
 import { PageThumb } from '../pages/PageThumb';
 import { useProjectPages } from '../pages/usePages';
 import { standIn } from '../pip/standIn';
-import { ProjectIcon } from '../ProjectIcon';
 import { SchedulesPanel } from '../SchedulesPanel';
 import { ProjectSettingsBody } from '../ProjectView';
 import { PullRequestsPanel } from '../PullRequestsPanel';
-import { LiveAgentAvatar } from '../state';
 import { TerminalTab } from '../TerminalTab';
 import { TimelinePanel, useTimeline } from '../timeline/Timeline';
 import { Button } from '../ui/button';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '../ui/menu';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Switch } from '../ui/switch';
 import { Tip } from '../ui/tooltip';
 import { PanelBrowser } from './PanelBrowser';
-import { DeskGlyph } from './DesktopPeek';
+import { AgentList, AgentStrip } from './AgentList';
 import { chatOf } from './PanelButton';
-import { useInUse } from '../pip/PipLane';
 import { PickButton, usePicker } from '../PickElement';
-
-const deskShort: Record<Desk, MessageKey> = { live: 'desk.short.live', on: 'desk.short.on', asleep: 'desk.short.asleep' };
 
 const viewIcon: Record<PanelView, LucideIcon> = {
   desktop: Monitor,
@@ -116,7 +116,7 @@ const viewLabel: Record<PanelView, MessageKey> = {
 // RightPanelHost sits beside the main column of App, for a view with a chat:
 // it lays the chat's panel out beside the chat or as a drawer, and listens
 // for ⌘D, Escape and a file a chat opens.
-export function RightPanelHost({ view, onSelect }: { view: View; onSelect: (view: View) => void }) {
+export function RightPanelHost({ view, onSelect, onNewAgent }: { view: View; onSelect: (view: View) => void; onNewAgent: (project: string) => void }) {
   const t = useT();
   const at = chatOf(view);
   const state = usePanel();
@@ -145,7 +145,7 @@ export function RightPanelHost({ view, onSelect }: { view: View; onSelect: (view
       if ((event.target as Element | null)?.closest?.('.xterm, canvas')) return;
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'd') {
         event.preventDefault();
-        setPanelOpen(chat, !chatPanel(panelState(), chat).open);
+        panelToggle(chat);
       }
     };
     addEventListener('keydown', onKey);
@@ -158,38 +158,48 @@ export function RightPanelHost({ view, onSelect }: { view: View; onSelect: (view
     };
   }, [chat]);
 
-  // A window narrowed past where the panel fits beside the chat closes it,
-  // rather than turning it into a drawer over the chat you were reading;
-  // opened again there, it is a drawer (UX test, finding 8).
-  const box = panelBox(panelWant(state, chat, room), room, windowWidth);
+  // On the list, its own narrow width, or its strip. Where even the list
+  // doesn't fit beside the chat, the strip stays beside it and the rest
+  // opens over the chat as a drawer, from the strip or the header's button.
+  const list = onList(state, chat);
+  const lead = isLeadRef(chat);
+  const box = list ? listBox(state, room, windowWidth) : panelBox(panelWant(state, chat, room), room, windowWidth);
+  const narrow = box.drawer || (list && state.listFolded && listBox({ ...state, listFolded: false }, room, windowWidth).drawer);
+  const drawerWidth = list ? listBox({ ...state, listFolded: false }, room, windowWidth).width : box.width;
   const measured = room > 0;
-  const wasDrawer = useRef<boolean | null>(null);
   useEffect(() => {
-    if (!measured) return;
-    setFitsBeside(!box.drawer);
-    const was = wasDrawer.current;
-    wasDrawer.current = box.drawer;
-    if (was === false && box.drawer && chat && chatPanel(panelState(), chat).open) setPanelOpen(chat, false);
-  }, [box.drawer, measured, chat]);
+    if (measured) setFitsBeside(!narrow);
+  }, [narrow, measured]);
 
   if (!at) return <span ref={probe} hidden />;
+  const panel = (drawer: boolean, width: number) => <RightPanel project={at.project} chat={at.chat} width={width} drawer={drawer} onSelect={onSelect} onNewAgent={onNewAgent} />;
   return (
     <>
       <span ref={probe} hidden />
-      {chatPanel(state, chat).open && room > 0 && (
+      {measured && (
+        <aside
+          style={{ width: narrow ? listStrip : box.width }}
+          aria-label={t('panel.label')}
+          className="relative flex h-full shrink-0 border-l border-line bg-sunken"
+          data-right-panel={narrow ? 'strip' : 'beside'}
+        >
+          {!narrow && !(list && state.listFolded) && <WidthHandle width={box.width} which={list ? 'list' : lead ? 'lead' : 'agent'} />}
+          {narrow ? <AgentStrip project={at.project} chat={at.chat} onSelect={onSelect} onUnfold={() => setPanelOpen(chat, true)} /> : panel(false, box.width)}
+        </aside>
+      )}
+      {measured && narrow && chatPanel(state, chat).open && (
         <>
-          {box.drawer && <div className="fixed inset-0 z-40 animate-fade-in bg-scrim backdrop-blur-sm" onClick={() => setPanelOpen(chat, false)} data-panel-scrim />}
+          <div className="fixed inset-0 z-40 animate-fade-in bg-scrim backdrop-blur-sm" onClick={() => setPanelOpen(chat, false)} data-panel-scrim />
           <aside
-            style={{ width: box.width }}
+            style={{ width: drawerWidth }}
             aria-label={t('panel.label')}
-            className={cn('relative flex h-full shrink-0 border-l border-line bg-sunken', box.drawer && 'fixed inset-y-0 right-0 z-50 animate-fade-in bg-modal shadow-[-20px_0_60px_-20px_var(--ab-shadow-deep)]')}
+            className="fixed inset-y-0 right-0 z-50 flex h-full animate-fade-in border-l border-line bg-modal shadow-[-20px_0_60px_-20px_var(--ab-shadow-deep)]"
             onKeyDown={(event) => {
-              if (event.key === 'Escape' && box.drawer) setPanelOpen(chat, false);
+              if (event.key === 'Escape') setPanelOpen(chat, false);
             }}
-            data-right-panel={box.drawer ? 'drawer' : 'beside'}
+            data-right-panel="drawer"
           >
-            {!box.drawer && <WidthHandle width={box.width} lead={isLeadRef(chat)} />}
-            <RightPanel project={at.project} chat={at.chat} width={box.width} onSelect={onSelect} />
+            {panel(true, drawerWidth)}
           </aside>
         </>
       )}
@@ -197,9 +207,9 @@ export function RightPanelHost({ view, onSelect }: { view: View; onSelect: (view
   );
 }
 
-// WidthHandle drags the panel's left edge, a lead's or an agent's width; a
-// double click puts it back.
-function WidthHandle({ width, lead }: { width: number; lead: boolean }) {
+// WidthHandle drags the panel's left edge, the list's, a lead's or an
+// agent's width; a double click puts it back.
+function WidthHandle({ width, which }: { width: number; which: 'list' | 'lead' | 'agent' }) {
   const last = useRef<number | null>(null);
   const w = useRef(width);
   w.current = width;
@@ -218,185 +228,142 @@ function WidthHandle({ width, lead }: { width: number; lead: boolean }) {
         const dx = event.clientX - last.current;
         if (!dx) return;
         last.current = event.clientX;
+        if (which === 'list') return setPanel({ listWidth: Math.max(listMin, w.current - dx) });
         const next = Math.max(panelMin, w.current - dx);
-        setPanel(lead ? { width: next } : { agentWidth: next });
+        setPanel(which === 'lead' ? { width: next } : { agentWidth: next });
       }}
       onPointerUp={() => (last.current = null)}
       onPointerCancel={() => (last.current = null)}
-      onDoubleClick={() => setPanel(lead ? { width: panelDefault } : { agentWidth: undefined })}
+      onDoubleClick={() => setPanel(which === 'list' ? { listWidth: undefined } : which === 'lead' ? { width: panelDefault } : { agentWidth: undefined })}
       data-panel-splitter
     />
   );
 }
 
-// The project's agents, past agents and fleet: whose the panel shows, and
-// which agent was active last.
+// The project's agents and past agents: whose the panel shows.
 function useAgents(project: string) {
   const agents = useQuery({ queryKey: ['agents'], queryFn: api.agents });
   const past = useQuery({ queryKey: [...pastAgentsKey, 'panel', project], queryFn: () => api.archivedAgents({ project, limit: 50 }), staleTime: 30_000 });
-  const fleet = useQuery({ queryKey: ['fleet', project], queryFn: () => api.fleet(project), staleTime: 30_000 });
   const mine = useMemo(() => (agents.data ?? []).filter((a) => a.project === project), [agents.data, project]);
-  return { agents: mine, past: past.data ?? [], fleet: fleet.data?.agents ?? [], loaded: !agents.isPending && !past.isPending };
+  return { agents: mine, past: past.data ?? [] };
 }
 
-function RightPanel({ project, chat, width, onSelect }: { project: string; chat: string; width: number; onSelect: (view: View) => void }) {
+function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { project: string; chat: string; width: number; drawer: boolean; onSelect: (view: View) => void; onNewAgent: (project: string) => void }) {
   const t = useT();
   const state = usePanel();
   const panel = chatPanel(state, chat);
-  const { agents, past, fleet, loaded } = useAgents(project);
-  // Who is using their desktop now, as the lane of desktops shows them.
-  const live = useInUse(project).map((a) => a.ref);
+  const { agents, past } = useAgents(project);
   const stored = panelTarget(state, chat);
   const lead = isLeadRef(chat);
   let whose = stored ? resolveWhose(stored, project, agents, past) : undefined;
-  // The lead's panel doesn't fall back on an agent retired since it was last
-  // shown, unless it was a past agent when it was picked.
+  // The lead's panel doesn't show an agent retired since it was last shown,
+  // unless it was a past agent when it was picked: it shows the list.
   if (lead && whose?.kind === 'past' && stored && !isPastRef(stored)) whose = undefined;
-  if (!whose && loaded) {
-    const recent = mostRecent(project, agents, fleet, live);
-    whose = recent ? { kind: 'agent', agent: recent } : { kind: 'lead', ref: leadOf(project) };
-  }
   const ref = whose && whoseRef(whose);
-  // What the lead's panel fell back on is its last from now on, for the lane
-  // of desktops to leave its tile out.
-  useEffect(() => {
-    if (lead && ref && ref !== stored) setPanel({ last: { ...panelState().last, [project]: ref } });
-  }, [lead, ref, stored, project]);
   const view: PanelView | undefined = panel.wide ?? (whose && viewOf(state, whose));
   // The switch's labels, as there is room: all of them, the lit one's, none.
   const labels = width >= 520 ? 'all' : width >= 400 ? 'on' : 'none';
+  const projectName = projectLabel(project, useQuery({ queryKey: ['projects'], queryFn: api.projects }).data);
 
+  if (!whose && !panel.wide && state.listFolded && !drawer) return <AgentStrip project={project} chat={chat} onSelect={onSelect} onUnfold={() => setPanel({ listFolded: false })} />;
   return (
-    <div className="flex min-w-0 flex-1 flex-col" data-panel-view={view} data-panel-whose={ref}>
+    <div className="flex min-w-0 flex-1 flex-col" data-panel-view={view ?? listTarget} data-panel-whose={ref}>
       <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-line-faint bg-rail pl-2 pr-1.5">
-        {whose ? <Picker project={project} chat={chat} whose={whose} agents={agents} fleet={fleet} live={live} /> : <span className="flex-1" />}
+        {(whose || panel.wide) && (
+          <Tip label={t('panel.back')}>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={t('panel.back')}
+              onClick={() => {
+                // In an agent's chat, opened from the lead's list, back is to
+                // the lead's chat and its list, in one click.
+                if (!lead && !panel.wide) {
+                  panelBack(leadOf(project));
+                  setPanelOpen(leadOf(project), true);
+                  onSelect({ kind: 'project', project });
+                } else panelBack(chat);
+              }}
+              data-panel-back
+            >
+              <ArrowLeft />
+            </Button>
+          </Tip>
+        )}
+        {whose ? (
+          <WhoseTitle project={project} chat={chat} whose={whose} onSelect={onSelect} />
+        ) : (
+          !panel.wide && (
+            <span className="flex min-w-0 items-center gap-2 pl-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle">{t('agent.rail.agents')}</span>
+              {agents.length > 0 && <span className="rounded-full bg-surface-raised px-1.5 text-[10.5px] tabular-nums text-subtle">{agents.length}</span>}
+            </span>
+          )
+        )}
         {whose && <ViewSwitch chat={chat} whose={whose} view={view} labels={labels} />}
         <span className="min-w-0 flex-1" />
-        {whose && <MoreMenu chat={chat} whose={whose} view={view} />}
-        <Tip label={t('panel.closeTip', { keys: shortcut('D') })}>
-          <Button size="icon-sm" variant="ghost" aria-label={t('panel.close')} onClick={() => setPanelOpen(chat, false)} data-panel-close>
-            <X />
-          </Button>
-        </Tip>
+        {!whose && !panel.wide && (
+          <Tip label={t('agent.rail.newAgentIn', { project: projectName })}>
+            <Button size="icon-sm" variant="ghost" aria-label={t('agent.rail.newAgentIn', { project: projectName })} onClick={() => onNewAgent(project)} data-panel-new-agent>
+              <Plus />
+            </Button>
+          </Tip>
+        )}
+        <MoreMenu chat={chat} whose={whose ?? { kind: 'lead', ref: leadOf(project) }} view={view} />
+        {!whose && !panel.wide && (
+          <Tip label={t('panel.list.fold')}>
+            <Button size="icon-sm" variant="ghost" aria-label={t('panel.list.fold')} onClick={() => (drawer ? setPanelOpen(chat, false) : setPanel({ listFolded: true }))} data-panel-fold>
+              <ChevronsRight />
+            </Button>
+          </Tip>
+        )}
+        {(whose || panel.wide) && (
+          <Tip label={t('panel.back')}>
+            <Button size="icon-sm" variant="ghost" aria-label={t('panel.back')} onClick={() => panelClose(chat)} data-panel-close>
+              <X />
+            </Button>
+          </Tip>
+        )}
       </div>
-      {whose && view && (
-        <ErrorBoundary key={`${ref}:${view}`} fallback={<p className="p-4 text-xs text-subtle">{t('panel.failed')}</p>}>
+      <ErrorBoundary key={`${ref ?? listTarget}:${view ?? ''}`} fallback={<p className="p-4 text-xs text-subtle">{t('panel.failed')}</p>}>
+        {panel.wide ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <Body project={project} chat={chat} whose={whose} view={view} width={width} focus={panel.focus} section={state.section} onSelect={onSelect} />
+            <ProjectView project={project} chat={chat} view={panel.wide} section={state.section} onSelect={onSelect} />
           </div>
-        </ErrorBoundary>
-      )}
+        ) : whose && view ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <Body project={project} chat={chat} whose={whose} view={view} width={width} focus={panel.focus} />
+          </div>
+        ) : (
+          <AgentList project={project} chat={chat} onSelect={onSelect} onNewAgent={onNewAgent} />
+        )}
+      </ErrorBoundary>
     </div>
   );
 }
 
 // ——— The header ———
 
-// Picker is whose the panel shows, "● Invoice due dates ▾": its status dot
-// and title, and the list to pick another from, the repository then the
-// project's agents with a machine.
-function Picker({ project, chat, whose, agents, fleet, live }: { project: string; chat: string; whose: Whose; agents: T.Agent[]; fleet: T.FleetAgent[]; live: string[] }) {
+// WhoseTitle is whose the panel shows, "● Invoice due dates": its status dot
+// and title; a click opens its chat, unless that's the one beside it.
+function WhoseTitle({ project, chat, whose, onSelect }: { project: string; chat: string; whose: Whose; onSelect: (view: View) => void }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
-  const busy = new Set(fleet.filter((f) => f.busy).map((f) => f.ref));
-  // Those using their desktops first: the ones the lane would show.
-  const list = pickable(project, agents)
-    .filter((a) => matches(`${a.name} ${a.title} ${a.branch}`, query))
-    .toSorted((a, b) => Number(live.includes(b.ref)) - Number(live.includes(a.ref)));
-  const repo = t('panel.repository');
-  const current = whoseRef(whose);
-  const pick = (ref: string) => {
-    setOpen(false);
-    setQuery('');
-    pickTarget(chat, ref);
-  };
+  const target: View = whose.kind === 'lead' ? { kind: 'project', project } : whose.kind === 'agent' ? { kind: 'agent', ref: whose.agent.ref } : { kind: 'pastAgents', ref: whose.past.ref };
+  const here = (whose.kind === 'lead' && isLeadRef(chat)) || (whose.kind === 'agent' && whose.agent.ref === chat);
+  const title = whoseTitle(t, whose);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn('flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-surface', open && 'bg-surface')}
-          aria-label={t('panel.picker')}
-          data-panel-picker
-        >
-          <StatusDot whose={whose} busy={whose.kind === 'agent' && (busy.has(whose.agent.ref) || live.includes(whose.agent.ref))} />
-          <span className="min-w-0 truncate text-[12.5px] font-semibold text-title">{whoseTitle(t, whose)}</span>
-          <ChevronDown className="size-3.5 shrink-0 text-subtle" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(340px,calc(100vw-32px))] p-0" data-panel-picker-list>
-        <div className="flex items-center gap-2 border-b border-line-faint px-3 py-2">
-          <Search className="size-3.5 shrink-0 text-faint" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('panel.find')}
-            aria-label={t('panel.find')}
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-primary outline-none placeholder:text-faint"
-            data-whose-find
-          />
-        </div>
-        <div className="max-h-[min(420px,calc(var(--radix-popover-content-available-height,100vh)-64px))] overflow-y-auto p-1">
-          {matches(repo, query) && (
-            <Row
-              active={whose.kind === 'lead'}
-              onClick={() => pick(leadOf(project))}
-              icon={<RepoIcon project={project} className="size-7 text-[11px]" />}
-              title={
-                <>
-                  {repo} <Crown className="size-3 text-amber-300" />
-                </>
-              }
-              sub={t('panel.repositorySub', { project: projectLabel(project, projects.data) })}
-              right={t('panel.host')}
-              data-whose-row="lead"
-            />
-          )}
-          {list.length > 0 && <div className="px-2 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-wide text-faint">{t('panel.agents')}</div>}
-          {list.map((a) => (
-            <Row
-              key={a.ref}
-              active={a.ref === current}
-              onClick={() => pick(a.ref)}
-              icon={<LiveAgentAvatar agent={a} className="size-7" />}
-              title={
-                <>
-                  <StatusDot whose={{ kind: 'agent', agent: a }} busy={busy.has(a.ref)} />
-                  <span className="truncate">{a.title || a.name}</span>
-                </>
-              }
-              sub={a.title ? `${a.name} · ${a.branch}` : a.branch}
-              right={
-                <>
-                  <DeskGlyph desk={deskOf(a, live.includes(a.ref))} />
-                  {t(deskShort[deskOf(a, live.includes(a.ref))])}
-                </>
-              }
-              data-whose-row={a.ref}
-            />
-          ))}
-          {list.length === 0 && <p className="px-3 py-4 text-center text-[12px] text-subtle">{query ? t('panel.noMatch') : t('panel.noAgents')}</p>}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function Row({ active, onClick, icon, title, sub, right, ...rest }: { active: boolean; onClick: () => void; icon: ReactNode; title: ReactNode; sub: string; right: ReactNode; 'data-whose-row': string }) {
-  return (
-    <button type="button" onClick={onClick} className={cn('flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left', active ? 'bg-surface-raised' : 'hover:bg-surface')} aria-current={active || undefined} {...rest}>
-      {icon}
-      <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-title">{title}</span>
-        <span className="block truncate text-[11px] text-subtle">{sub}</span>
-      </span>
-      <span className="flex shrink-0 items-center gap-1.5 text-[10.5px] text-faint">
-        {right}
-        {active && <Check className="size-3.5 text-brand-300" />}
-      </span>
-    </button>
+    <Tip label={here ? title : t('panel.openChat', { name: title })}>
+      <button
+        type="button"
+        disabled={here}
+        onClick={() => onSelect(target)}
+        className="flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-md px-1.5 py-1 text-left enabled:hover:bg-surface"
+        data-panel-whose-title
+      >
+        <StatusDot whose={whose} />
+        <span className="min-w-0 truncate text-[12.5px] font-semibold text-title">{title}</span>
+      </button>
+    </Tip>
   );
 }
 
@@ -460,7 +427,7 @@ function MoreMenu({ chat, whose, view }: { chat: string; whose: Whose; view: Pan
       <MenuContent align="end">
         {moreViews.map((v, i) => (
           <span key={v}>
-            {i === 2 && <MenuSeparator />}
+            {i > 0 && projectWide(v) && !projectWide(moreViews[i - 1]) && <MenuSeparator />}
             <MenuItem icon={viewIcon[v]} disabled={!hasView(whose, v)} onSelect={() => setView(chat, whoseRef(whose), v)} hint={view === v ? <Check className="size-3.5" /> : undefined} data-panel-more-view={v}>
               {t(viewLabel[v])}
             </MenuItem>
@@ -470,8 +437,6 @@ function MoreMenu({ chat, whose, view }: { chat: string; whose: Whose; view: Pan
     </Menu>
   );
 }
-
-const matches = (text: string, query: string) => !query.trim() || query.toLowerCase().split(/\s+/).every((word) => text.toLowerCase().includes(word));
 
 // whoseTitle is whose the panel shows, by what it's for: an agent's title
 // (its name until it has one), or the repository.
@@ -491,16 +456,10 @@ function StatusDot({ whose, busy }: { whose: Whose; busy?: boolean }) {
   return <span title={t(asleep ? 'panel.machine.asleep' : 'panel.machine.running')} className={cn('block size-2 shrink-0 rounded-full', asleep ? 'bg-faint' : 'bg-emerald-400', busy && 'animate-pulse')} data-panel-dot={asleep ? 'asleep' : 'running'} />;
 }
 
-function RepoIcon({ project, className }: { project: string; className?: string }) {
-  const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
-  const p = projects.data?.find((x) => x.name === project);
-  return p ? <ProjectIcon project={p} className={cn('rounded-md text-[10px]', className)} /> : <span className={cn('shrink-0 rounded-md bg-surface-strong', className)} />;
-}
-
 // ——— The views ———
 
-function Body({ project, chat, whose, view, width, focus, section, onSelect }: { project: string; chat: string; whose: Whose; view: PanelView; width: number; focus?: string; section: PanelState['section']; onSelect: (view: View) => void }) {
-  if (projectWide(view)) return <ProjectView project={project} chat={chat} view={view} section={section} onSelect={onSelect} />;
+function Body({ project, chat, whose, view, width, focus }: { project: string; chat: string; whose: Whose; view: PanelView; width: number; focus?: string }) {
+  if (projectWide(view)) return null;
   const titled = (body: ReactNode) => (
     <>
       <ViewTitle view={view} />
