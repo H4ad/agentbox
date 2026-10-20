@@ -3,7 +3,11 @@
 Applied by the Dockerfile in name order: `crosvm-*` to crosvm, `cloud-hypervisor-*`
 to Cloud Hypervisor after Spectrum's patchset.
 
-- `crosvm-0001-gpu-render-node-parameter.patch`: ours, not upstream (crosvm's
+- `crosvm-0001-gpu-render-node-parameter.patch`: **inert for now**: rutabaga
+  0.1.75's `get_drm_fd` drops every render node (`is_valid_gpu_path` checks
+  `Path::starts_with("/dev/dri/renderD")`, which compares whole components and
+  so is false for `/dev/dri/renderD128`). try.sh keeps crosvm to the node with a
+  mount namespace instead (`lib/gpu-ns.sh`). Ours, not upstream (crosvm's
   main has no equivalent). A `render-node` key in `device gpu --params`, added
   as a GPU path for rutabaga, which hands its fd to virglrenderer
   (`get_drm_fd`). Without it virglrenderer renders GL on the first

@@ -161,14 +161,18 @@ llvmpipe or fail, as they should with no 3D.
   and the summary counts it; without `external-blob`, the first such blob (resource 23 on an RX
   6750 XT) made Cloud Hypervisor drop the device and crosvm panic.
 - **Which GPU**: `--render-node` (default `renderD128`; `--check` lists them) picks the host GPU.
-  - **GL:** our crosvm patch's `render-node` hands virglrenderer that node's fd, and `surfaceless`
-    off makes it take its EGL display from the GBM device on it. Surfaceless, Mesa picks its own
-    default device whatever the fd: an iGPU on an iGPU+dGPU machine. virglrenderer only matches an
-    EGL device to the fd when built against minigbm, not Mesa's libgbm.
-  - **Vulkan:** Venus offers every host GPU, and the guest puts the chosen one first with Mesa's
-    device-select layer, in the guest. On the host, in `virgl_render_server`, that layer breaks
-    Venus: vkr fails `vkEnumeratePhysicalDeviceGroups` with `ERROR_INITIALIZATION_FAILED`.
-  - **The summary** says where each ran: GL from the render node crosvm had open, Vulkan from the
+  - **Both:** crosvm, and the Venus render server it starts, run in a user and mount namespace
+    whose `/dev/dri` holds only that node (`lib/gpu-ns.sh` with `unshare`, else `bwrap`; `--check`
+    says which). virglrenderer takes the first render node it finds and can't be told another:
+    rutabaga 0.1.75's `get_drm_fd`, which our crosvm patch's `render-node` feeds, rejects every
+    render node (`Path::starts_with("/dev/dri/renderD")` compares whole components), so the patch
+    does nothing until that's fixed. Without user namespaces or bwrap, GL takes whichever node
+    comes first, and the summary flags it.
+  - **Not** Mesa's device-select layer on the host: in the render server it breaks Venus (vkr
+    fails `vkEnumeratePhysicalDeviceGroups` with `ERROR_INITIALIZATION_FAILED`). Nor `DRI_PRIME`:
+    virglrenderer's node choice ignores it, and that same layer reads it. The guest still puts the
+    chosen GPU first with the layer, in the guest, where it's harmless.
+  - **The summary** says where each ran: GL from the render node crosvm had open (by device number), Vulkan from the
     vendor:device vkmark used. It flags either one not on the chosen node.
 - **No display**: crosvm runs with its stub display, so the guest has a scanout (its X server
   works) but nothing is shown on the host. AgentBox's agents draw on their own virtual displays,

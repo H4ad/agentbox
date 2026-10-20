@@ -137,7 +137,15 @@ has "crosvm: surfaceless off (EGL from the GBM device)" "$cl" '"surfaceless":fal
 has "crosvm: render-node" "$cl" '"render-node":"/dev/dri/renderD128"'
 has "crosvm: external-blob" "$cl" '"external-blob":true'
 hasnt "crosvm: no device-select layer for virgl_render_server (breaks Venus)" "$cl" "MESA_VK_DEVICE_SELECT"
-render_node=/dev/dri/renderD128 bin='' work=''
+CHVGPU_ISOLATE=unshare crosvm_command
+cl="${crosvm[*]}"
+has "crosvm: kept to its node (unshare)" "$cl" "unshare --user --map-root-user --mount $here/lib/gpu-ns.sh /dev/dri/renderD128 /dev/dri"
+eq "crosvm: isolation recorded" "$isolation" "unshare"
+CHVGPU_ISOLATE=bwrap crosvm_command
+has "crosvm: kept to its node (bwrap)" "${crosvm[*]}" "bwrap --dev-bind / / --tmpfs /dev/dri --dev-bind /dev/dri/renderD128 /dev/dri/renderD128 --"
+CHVGPU_ISOLATE=none crosvm_command
+eq "crosvm: no isolation, crosvm itself" "${crosvm[0]} ${crosvm[6]}" "env /opt/x/bin/crosvm"
+render_node=/dev/dri/renderD128 bin='' work='' isolation=''
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
 eq "ratio by zero" "$(ratio 5 0)" "?"
