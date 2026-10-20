@@ -1,0 +1,2 @@
+[2026-10-21T09:02:11.000000000+00:00 ERROR devices::virtio::gpu::virtio_gpu] Failed to map blob, resource id 41: can't fallback to external mapping with external blob enabled
+[2026-10-21T09:02:11.100000000+00:00 ERROR devices::virtio::gpu::virtio_gpu] Failed to map blob, resource id 42: can't fallback to external mapping with external blob enabled

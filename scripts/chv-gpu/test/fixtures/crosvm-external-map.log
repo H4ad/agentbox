@@ -1,0 +1,6 @@
+[2026-10-20T21:14:02.118374512+00:00 ERROR gpu_display] failed to open display: unsupported by the implementation
+[2026-10-20T21:19:47.903117044+00:00 ERROR devices::virtio::gpu::virtio_gpu] Failed to map blob, resource id 23: failed to add the memory mapping: create external mapping: socket error: Connection reset by peer (os error 104)
+thread 'v_gpu' panicked at devices/src/virtio/vhost_user_backend/gpu.rs:239:18:
+failed to recover queue from worker
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+[2026-10-20T21:19:47.912003851+00:00 INFO  devices::virtio::vhost_user_backend::handler] vhost-user connection closed, exiting with success

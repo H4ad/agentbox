@@ -7,3 +7,5 @@ Replace them with real ones from a try.sh --keep run.
 chv-nokvm.log and chv-parse-error.log: real Cloud Hypervisor v50 output, with
 no KVM and with v53's image_type. chv-panic.log is put together from the lines
 of a user's run (issue #7766's panic): its backtraces are cut short.
+crosvm-external-map.log and crosvm-no-fallback.log: put together from the
+lines of a user's run (and the message crosvm 18bc84d0 has for the second).

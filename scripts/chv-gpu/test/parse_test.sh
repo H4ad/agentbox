@@ -94,6 +94,18 @@ eq "chv failure: no KVM" "$(chv_failure "$fx/chv-nokvm.log")" \
 printf 'one\ntwo\nthree\nfour\n' > "$tmp/plain.log"
 eq "chv failure: otherwise the last lines" "$(chv_failure "$tmp/plain.log")" "two three four"
 eq "chv failure: no log" "$(chv_failure "$tmp/nonexistent")" ""
+eq "crosvm failure: its first panic" "$(chv_failure "$fx/crosvm-external-map.log")" \
+	"thread 'v_gpu' panicked at devices/src/virtio/vhost_user_backend/gpu.rs:239:18: failed to recover queue from worker"
+problems=()
+blob_problems "$fx/crosvm-external-map.log"
+eq "blobs: EXTERNAL_MAP named" "${problems[*]}" \
+	"crosvm sent 1 blob(s) as EXTERNAL_MAP, which Spectrum's patchset doesn't implement (external-blob off?)"
+problems=()
+blob_problems "$fx/crosvm-no-fallback.log"
+has "blobs: unexportable ones counted" "${problems[*]}" "2 blob(s) couldn't be exported as an fd"
+problems=()
+blob_problems "$fx/glxinfo-sw.txt"
+eq "blobs: none" "${#problems[@]}" "0"
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
 eq "ratio by zero" "$(ratio 5 0)" "?"

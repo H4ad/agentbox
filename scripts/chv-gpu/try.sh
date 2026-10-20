@@ -345,10 +345,16 @@ run_guest() {
 	# stub, which still gives the guest a scanout for its X server.
 	# virglrenderer finds the render node itself (the first one, renderD128);
 	# Venus runs in virgl_render_server, which crosvm starts.
+	# external-blob: every blob the guest maps must reach Cloud Hypervisor as
+	# an fd (SHMEM_MAP). Without it crosvm falls back, for GL buffers, to
+	# EXTERNAL_MAP (a pointer into its own memory), which Spectrum's patchset
+	# doesn't implement: Cloud Hypervisor drops the device (InvalidMessage)
+	# and crosvm panics. With it, virglrenderer allocates those buffers with
+	# GBM (built with minigbm_allocation) and exports them as dma-bufs.
 	start crosvm env -u DISPLAY -u WAYLAND_DISPLAY \
 		RENDER_SERVER_EXEC_PATH="$bin/libexec/virgl_render_server" \
 		"$bin/bin/crosvm" --no-syslog device gpu --socket-path "$work/gpu.sock" \
-		--params '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true}'
+		--params '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true,"external-blob":true}'
 	wait_for_socket "$work/gpu.sock" "${pid[crosvm]}" crosvm
 	chv_command
 	# A panic's backtrace goes to its log, for whoever reads it with --keep.
@@ -362,7 +368,7 @@ run_guest() {
 		fi
 		if [ -z "$crosvm_gone" ] && ! alive "${pid[crosvm]}"; then
 			crosvm_gone=1
-			problem "crosvm exited during the run: $(tail -n 3 "$work/crosvm.log" | tr '\n' ' ')"
+			problem "crosvm exited during the run: $(chv_failure "$work/crosvm.log")"
 		fi
 		if ! alive "${pid[cloud-hypervisor]}"; then
 			grep -q '^CHVGPU-END' "$work/serial.log" 2>/dev/null && return 0
@@ -393,7 +399,7 @@ progress() {
 # summary SERIAL_LOG: the block to paste back. Reads the host facts from
 # variables check_prereqs' helpers fill in, so it can be tested on a log.
 summary() {
-	local serial=$1 r tmp gl_gpu gl_sw egl vk_gpu vk_sw g_gpu g_sw v_gpu v_sw feats
+	local serial=$1 tmp gl_gpu gl_sw egl vk_gpu vk_sw g_gpu g_sw v_gpu v_sw feats
 	tmp=$(mktemp)
 	if ! results "$serial" > "$tmp"; then
 		problem "no results from the guest (see the serial log with --keep)"
@@ -462,6 +468,7 @@ summary() {
 	is_software "${gl_gpu%%|*}" && problem "GL with the GPU fell back to software (${gl_gpu%%|*})"
 	[[ ${vk_gpu} == *"|cpu|"* ]] && problem "Vulkan with the GPU is the CPU (${vk_gpu})"
 	[ -n "$(section "$tmp" xorg)" ] && problem "Xorg didn't start: $(section "$tmp" xorg | grep -E '\(EE\)' | head -n 2 | tr '\n' ' ')"
+	blob_problems "$work/crosvm.log"
 	if [ ${#problems[@]} -gt 0 ]; then
 		echo "problems:"
 		printf '  - %s\n' "${problems[@]}"
@@ -473,6 +480,18 @@ summary() {
 	[ -z "$tail" ] || { echo "guest kernel (last lines):"; sed 's/^/  /' <<<"$tail"; }
 	echo "-----"
 	rm -f "$tmp"
+}
+
+# blob_problems CROSVM_LOG: a problem for each way crosvm failed to hand a
+# blob to Cloud Hypervisor, with what it means.
+blob_problems() {
+	[ -r "$1" ] || return 0
+	local n
+	n=$(grep -c "create external mapping" "$1" || true)
+	[ "$n" -gt 0 ] && problem "crosvm sent $n blob(s) as EXTERNAL_MAP, which Spectrum's patchset doesn't implement (external-blob off?)"
+	n=$(grep -c "can't fallback to external mapping" "$1" || true)
+	[ "$n" -gt 0 ] && problem "$n blob(s) couldn't be exported as an fd to map into the guest (opaque Vulkan memory, or GL without GL_EXT_memory_object_fd on the host)"
+	return 0
 }
 
 host_facts() {

@@ -152,6 +152,14 @@ llvmpipe or fail, as they should with no 3D.
   import dma-bufs (`VK_EXT_external_memory_dma_buf`, `VK_EXT_image_drm_format_modifier`), which
   NVIDIA's driver doesn't support, so Vulkan in the guest fails. virgl (OpenGL) goes through
   EGL/GBM, which NVIDIA supports from driver 495; it's untested. Nouveau/NVK is untested too.
+- **Blobs must be fds**: Spectrum's patchset handles only `SHMEM_MAP` from crosvm (map this fd
+  into the guest), not `EXTERNAL_MAP` (a pointer into crosvm's memory) or `GPU_MAP` (Vulkan
+  memory by device UUID). So try.sh turns on crosvm's `external-blob`, and virglrenderer is built
+  with `minigbm_allocation`: GL buffers the guest maps are GBM buffers exported as dma-bufs (the
+  host's GL needs `GL_EXT_memory_object_fd`), and Venus's are dma-bufs when the host's Vulkan
+  driver exports them (RADV and ANV do). A blob that can't be exported fails to map in the guest
+  and the summary counts it; without `external-blob`, the first such blob (resource 23 on an RX
+  6750 XT) made Cloud Hypervisor drop the device and crosvm panic.
 - **Which GPU**: virglrenderer opens the first render node itself, so on a machine with two GPUs
   the guest's OpenGL runs on `renderD128`, often the integrated one; `--render-node` only changes
   what try.sh checks. Venus lists every Vulkan device of the host, and the guest picks.

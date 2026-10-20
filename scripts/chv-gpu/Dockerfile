@@ -40,12 +40,18 @@ ENV PREFIX=/opt/chv-gpu
 COPY fetch-git.sh /usr/local/bin/fetch-git
 
 # --- virglrenderer, with Venus and its render server -------------------------
+# minigbm_allocation (with the system's libgbm, despite the name): with
+# crosvm's external-blob, which try.sh turns on, GL buffers the guest maps are
+# allocated as GBM buffers and exported as dma-bufs. Over vhost-user crosvm
+# can only hand Cloud Hypervisor a blob as an fd (SHMEM_MAP): Spectrum's
+# patchset has no EXTERNAL_MAP, the fallback that passes a pointer into
+# crosvm's own memory.
 ARG VIRGLRENDERER_REPO
 ARG VIRGLRENDERER_COMMIT
 RUN fetch-git virglrenderer "$VIRGLRENDERER_COMMIT" "$VIRGLRENDERER_REPO" && \
     cd virglrenderer && \
     meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
-      -Dvenus=true -Drender-server=true -Dplatforms=egl,glx \
+      -Dvenus=true -Drender-server=true -Dplatforms=egl,glx -Dminigbm_allocation=true \
       -Dtests=false -Dc_args=-ffile-prefix-map=/src/= && \
     ninja -C build install
 
