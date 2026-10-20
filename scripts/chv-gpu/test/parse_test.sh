@@ -85,6 +85,15 @@ eq "vkmark device" "$(bench_renderer "$fx/vkmark-venus.txt")" "Virtio-GPU Venus 
 eq "drm features" "$(drm_features "$fx/guest-info.txt")" "+virgl +edid +resource_blob +host_visible +context_init"
 eq "drm features over two lines" "$(section "$fx/results-qemu.txt" guest | drm_features -)" \
 	"-virgl +edid -resource_blob -host_visible -context_init"
+eq "chv failure: the first panic, with its message" "$(chv_failure "$fx/chv-panic.log")" \
+	"thread 'vmm' panicked at virtio-devices/src/transport/pci_device.rs:297:35: called \`Option::unwrap()\` on a \`None\` value"
+eq "chv failure: the error chain" "$(chv_failure "$fx/chv-parse-error.log")" \
+	"Error parsing config / Error parsing --disk / unknown option: image_type"
+eq "chv failure: no KVM" "$(chv_failure "$fx/chv-nokvm.log")" \
+	"Failed to open hypervisor interface (is hypervisor interface available?) / Failed to create the hypervisor / no supported hypervisor"
+printf 'one\ntwo\nthree\nfour\n' > "$tmp/plain.log"
+eq "chv failure: otherwise the last lines" "$(chv_failure "$tmp/plain.log")" "two three four"
+eq "chv failure: no log" "$(chv_failure "$tmp/nonexistent")" ""
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
 eq "ratio by zero" "$(ratio 5 0)" "?"

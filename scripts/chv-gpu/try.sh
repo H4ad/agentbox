@@ -351,7 +351,8 @@ run_guest() {
 		--params '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true}'
 	wait_for_socket "$work/gpu.sock" "${pid[crosvm]}" crosvm
 	chv_command
-	start cloud-hypervisor "${chv[@]}"
+	# A panic's backtrace goes to its log, for whoever reads it with --keep.
+	start cloud-hypervisor env RUST_BACKTRACE=1 "${chv[@]}"
 
 	say "Booting; the guest installs Mesa and the benchmarks, then runs them (a few minutes)"
 	local deadline=$((SECONDS + timeout_min * 60)) shown='' crosvm_gone=''
@@ -365,7 +366,7 @@ run_guest() {
 		fi
 		if ! alive "${pid[cloud-hypervisor]}"; then
 			grep -q '^CHVGPU-END' "$work/serial.log" 2>/dev/null && return 0
-			problem "Cloud Hypervisor exited before the guest finished: $(tail -n 3 "$work/cloud-hypervisor.log" | tr '\n' ' ')"
+			problem "Cloud Hypervisor exited before the guest finished: $(chv_failure "$work/cloud-hypervisor.log")"
 			return 1
 		fi
 		local stage

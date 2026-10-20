@@ -1,0 +1,5 @@
+cloud-hypervisor:   0.000745s: <main> ERROR:./cloud-hypervisor/cloud-hypervisor/src/lib.rs:23 -- Fatal error: ParsingConfig(ParseDisk(UnknownOption("image_type")))
+Error: Cloud Hypervisor exited with the following chain of errors:
+  0: Error parsing config
+  1: Error parsing --disk
+  2: unknown option: image_type

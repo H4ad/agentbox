@@ -84,6 +84,11 @@ RUN fetch() { curl -fsSL --retry 5 -o "$1" "$2" && echo "$3  $1" | sha256sum -c 
     tar xzf spectrum.tar.gz --strip-components=1 -C spectrum && \
     patch -d vhost -p1 --no-backup-if-mismatch < spectrum/vhost.patch && \
     patch -d cloud-hypervisor -p1 --no-backup-if-mismatch < spectrum/cloud-hypervisor.patch
+# Upstream fixes v50 lacks, after Spectrum's patchset (patches/README.md).
+COPY patches/ /src/patches/
+RUN for p in /src/patches/cloud-hypervisor-*.patch; do \
+      patch -d cloud-hypervisor -p1 --no-backup-if-mismatch < "$p" || exit 1; \
+    done
 # Static (musl), like Cloud Hypervisor's own release binaries.
 RUN cd cloud-hypervisor && \
     export RUSTFLAGS='--remap-path-prefix=/src=. --remap-path-prefix=/usr/local/cargo=cargo' && \

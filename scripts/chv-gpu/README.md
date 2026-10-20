@@ -39,6 +39,7 @@ All pinned in [`versions.env`](versions.env):
 |---|---|---|
 | Cloud Hypervisor | v50.0, static (musl) | Apache-2.0 AND BSD-3-Clause |
 | Spectrum OS GPU patchset | 50.0-spectrum0 | Apache-2.0 AND BSD-3-Clause (Google) |
+| upstream backport ([`patches/`](patches/README.md)) | 57e766bd (#7906, v52): no double activation with 2+ vCPUs | Apache-2.0 AND BSD-3-Clause |
 | rust-vmm vhost, vhost-user-backend | vhost-user-backend-v0.20.0, patched | Apache-2.0 OR BSD-3-Clause |
 | crosvm | 18bc84d0 (2025-11-24), default features + `virgl_renderer` | BSD-3-Clause |
 | minijail (linked into crosvm) | bfd22f25 | BSD-3-Clause |

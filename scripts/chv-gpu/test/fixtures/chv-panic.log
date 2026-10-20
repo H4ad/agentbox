@@ -1,0 +1,16 @@
+cloud-hypervisor: 12.004417s: <vmm> WARN:virtio-devices/src/vhost_user/vu_common_ctrl.rs:301 -- Failed to set VHOST_USER_SET_VRING_ENABLE
+thread 'vmm' panicked at virtio-devices/src/transport/pci_device.rs:297:35:
+called `Option::unwrap()` on a `None` value
+stack backtrace:
+   0: rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::panic
+   3: core::option::unwrap_failed
+   4: virtio_devices::transport::pci_device::VirtioPciDeviceActivator::activate
+thread 'vmm' panicked at vmm/src/device_manager.rs:5472:35:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+stack backtrace:
+   0: rust_begin_unwind
+thread 'vmm' panicked at library/core/src/panicking.rs:225:5:
+panic in a destructor during cleanup
+thread caused non-unwinding panic. aborting.

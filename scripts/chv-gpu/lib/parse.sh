@@ -120,6 +120,27 @@ drm_features() {
 	sed -n 's/.*\[drm\] features: *//p' "$1" | tr -s ' \t\n' ' ' | sed 's/^ //; s/ $//'
 }
 
+# chv_failure LOG: why Cloud Hypervisor stopped, from its log: the first
+# panic, with its message (Rust prints it on the next line), since what
+# follows a first panic (a PoisonError, an abort) is its consequence; else the
+# chain of errors it exited with, joined; else the log's last lines.
+chv_failure() {
+	local in
+	[ -r "$1" ] || return 0
+	in=$(tr -d '\r' < "$1")
+	awk '
+		/^thread .* panicked at / {
+			line = $0
+			if (line ~ /:$/ && (getline next_line) > 0) line = line " " next_line
+			print line; found = 1; exit
+		}
+		/^Error: .*exited with/ { chain = 1; out = ""; next }
+		chain && /^ *[0-9]+: / { sub(/^ *[0-9]+: /, ""); out = out (out == "" ? "" : " / ") $0; next }
+		chain { chain = 0 }
+		END { if (!found && out != "") print out }' <<<"$in" | grep . ||
+		tail -n 3 <<<"$in" | tr '\n' ' ' | sed 's/ *$//'
+}
+
 # ratio A B: A/B to one decimal, or "?" when either is missing or B is 0.
 ratio() {
 	awk -v a="$1" -v b="$2" 'BEGIN {
