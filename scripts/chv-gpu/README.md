@@ -1,0 +1,151 @@
+# A shared GPU for the Linux VM: phase 0
+
+A spike, not a feature: can AgentBox's Cloud Hypervisor VM share the host's GPU with its agents,
+the way the Mac (krunkit) and Windows (WSL) VMs do? Nothing here is used by AgentBox; nothing in
+`internal/hostvm` changes. Two scripts answer it: `build.sh` makes the binaries, `try.sh` boots a
+throwaway guest with them on a machine with KVM and a GPU and says what the guest got.
+
+## The pieces
+
+```
+guest: Mesa virgl (OpenGL), Mesa Venus (Vulkan)
+   │  virtio-gpu (3D, blob resources, host-visible memory)
+cloud-hypervisor + Spectrum's GPU patchset    ← the VMM: a vhost-user front end for virtio-gpu
+   │  vhost-user, plus a shared-memory region for blobs
+crosvm device gpu                             ← the device, a separate host process
+   │  rutabaga
+virglrenderer (GL contexts; Venus contexts in virgl_render_server)
+   │
+host Mesa / GPU driver on /dev/dri/renderD128
+```
+
+- **Cloud Hypervisor** has no GPU device of its own. [Spectrum OS](https://spectrum-os.org/software/cloud-hypervisor/)
+  keeps a patchset adding one: `--gpu socket=…`, a vhost-user frontend for crosvm's GPU backend
+  (not QEMU's `vhost-user-gpu` protocol), with patches to rust-vmm's `vhost` crates for the shared
+  memory region that host-visible blobs (and so Venus) need. Their newest, `50.0-spectrum0`,
+  targets Cloud Hypervisor v50.0. AgentBox's VM runs v53.0 today; the GPU would mean running a
+  patched v50 or porting the patches forward.
+- **crosvm's `device gpu`** is crosvm's virtio-gpu device as a standalone vhost-user backend. It
+  has no releases; the commit is the one Spectrum tested the patchset with.
+- **virglrenderer** turns the guest's virgl (OpenGL) and Venus (Vulkan) command streams into host
+  GL and Vulkan calls. Built with Venus and its render server (`libexec/virgl_render_server`,
+  which crosvm starts for Venus contexts).
+
+## Versions
+
+All pinned in [`versions.env`](versions.env):
+
+| | version | licence |
+|---|---|---|
+| Cloud Hypervisor | v50.0, static (musl) | Apache-2.0 AND BSD-3-Clause |
+| Spectrum OS GPU patchset | 50.0-spectrum0 | Apache-2.0 AND BSD-3-Clause (Google) |
+| rust-vmm vhost, vhost-user-backend | vhost-user-backend-v0.20.0, patched | Apache-2.0 OR BSD-3-Clause |
+| crosvm | 18bc84d0 (2025-11-24), default features + `virgl_renderer` | BSD-3-Clause |
+| minijail (linked into crosvm) | bfd22f25 | BSD-3-Clause |
+| virglrenderer | 1.2.0, `-Dvenus=true -Drender-server=true` | MIT |
+| Rust | 1.88.0 (crosvm's pin), 1.89.0 (Cloud Hypervisor's minimum) | |
+| build system | Debian 12, packages from snapshot.debian.org 2026-10-15 | |
+
+The Rust crates linked in are almost all MIT and/or Apache-2.0; nothing copyleft is linked. The
+tarball carries each project's licence files under `licenses/` and Spectrum's patches as applied.
+
+try.sh downloads, on the machine it runs on and not into the tarball: Debian 13's generic cloud
+image `20260914-2601` (the build AgentBox's VM uses; Debian's own licences), Cloud Hypervisor's
+EDK2 firmware `ch-97eeb7b09` (BSD-2-Clause-Patent), and passt (GPL-2.0-or-later) when the host
+has none.
+
+## build.sh
+
+```bash
+scripts/chv-gpu/build.sh [OUTPUT_DIR]     # default scripts/chv-gpu/out/
+```
+
+Builds in Docker (BuildKit), linux/amd64 only, in about 15 minutes on 4 cores.
+`CARGO_BUILD_JOBS` (default 4) bounds the Rust builds: Cloud Hypervisor links with LTO. Out come
+`chv-gpu-50.0-spectrum0-x86_64.tar.gz`, its `.sha256`, `VERSIONS` and `HOST-LIBRARIES`:
+
+```
+bin/cloud-hypervisor, bin/ch-remote   static
+bin/crosvm                            glibc ≥ 2.36, RUNPATH $ORIGIN/../lib
+libexec/virgl_render_server
+lib/libvirglrenderer.so.1             bundled: distributions' builds often lack Venus
+licenses/, VERSIONS, HOST-LIBRARIES, SHA256SUMS
+```
+
+**What the host must provide** (`HOST-LIBRARIES` lists the exact sonames): glibc 2.36 or newer
+(Debian 12, Ubuntu 22.10, Fedora 37 and later), and the graphics stack it renders with:
+`libepoxy`, `libdrm`, `libgbm`, `libvulkan` (the loader), `libEGL`/`libGL` through libepoxy,
+`libwayland-client`, `libX11`, `libcap`. These aren't bundled on purpose: they must be the host's
+own, matching its Mesa and its GPU driver. Any desktop Linux with Mesa installed has them.
+
+Reproducibility: every source is pinned by commit or SHA-256, Debian's packages by snapshot date,
+the Rust images by digest; paths are remapped, file times set to `SOURCE_DATE_EPOCH`, and the
+tarball written in a fixed order with fixed owners. A build and a `DOCKER_BUILD_FLAGS=--no-cache`
+rebuild gave the same tarball, byte for byte; nobody has compared builds from two machines yet.
+
+**arm64** isn't built. It would build the same way on an arm64 host (with
+`aarch64-unknown-linux-musl`), but cross-building crosvm and virglrenderer needs an arm64 sysroot
+of the graphics libraries, and AgentBox's Linux VM is amd64-only today anyway.
+
+## try.sh
+
+```bash
+scripts/chv-gpu/try.sh --check            # prerequisites only
+scripts/chv-gpu/try.sh                    # the run: 5 to 15 minutes, mostly apt in the guest
+scripts/chv-gpu/try.sh --keep             # and keep the serial log, disk and process logs
+```
+
+Runs as your user: no root, no tap device, no firewall rules. It needs `/dev/kvm` and the render
+node readable and writable by you (the `kvm` and `render` groups), `curl`, `tar`, `xz`, and one
+of `cloud-localds`, `genisoimage`, `mkisofs`, `xorriso` or `mkfs.vfat`+`mcopy` for the cloud-init
+seed. It then:
+
+1. checks those, and reports the render node's driver and PCI id, the host's Mesa and
+   virglrenderer packages, and its own Vulkan device;
+2. starts passt (the guest's network, as in AgentBox's VM), crosvm's GPU device on the render node
+   with GL (virgl) and Vulkan (Venus) contexts and no window (crosvm's stub display), and Cloud
+   Hypervisor with `--gpu`, a copy of Debian 13's generic image (its kernel has `virtio_gpu`; the
+   cloud kernel AgentBox's VM uses doesn't) and a cloud-init seed;
+3. in the guest, cloud-init installs Mesa's drivers, `mesa-utils`, `vulkan-tools`, glmark2, vkmark
+   and Xorg, then [`guest/run-tests.sh`](guest/run-tests.sh) runs `glxinfo -B`,
+   `eglinfo -B`, `vulkaninfo --summary`, ~20 s of glmark2 and ~20 s of vkmark on the GPU, and then
+   `glxinfo`, `vulkaninfo`, glmark2 and vkmark again with `LIBGL_ALWAYS_SOFTWARE=1` and only
+   lavapipe, prints it all on the serial console and powers off;
+4. prints one summary block to paste back: host, guest, renderers, scores with the GPU and in
+   software, and what went wrong.
+
+Every process it starts runs in its own session and is stopped when it exits, Ctrl-C included,
+and its work directory (`~/.cache/agentbox-chv-gpu/run.*`) is removed unless `--keep`. Downloads
+stay cached in `~/.cache/agentbox-chv-gpu`; delete it to free 1.5 GB. AgentBox's own VM, its
+files, sockets and processes aren't touched, and it can run at the same time.
+
+## Tests
+
+```bash
+scripts/chv-gpu/test/parse_test.sh        # the parsing and the summary, against fixtures/
+scripts/chv-gpu/test/guest-in-qemu.sh     # the guest half under QEMU, no GPU or KVM needed
+```
+
+`guest-in-qemu.sh` boots the same image, seed and guest script under QEMU with its 2D virtio GPU:
+cloud-init, the packages, Xorg, the framing and the summary are checked; the GPU runs fall back to
+llvmpipe or fail, as they should with no 3D.
+
+## Known not to work, or not tried
+
+- **NVIDIA's proprietary driver and Venus**: Venus needs the host's Vulkan driver to export and
+  import dma-bufs (`VK_EXT_external_memory_dma_buf`, `VK_EXT_image_drm_format_modifier`), which
+  NVIDIA's driver doesn't support, so Vulkan in the guest fails. virgl (OpenGL) goes through
+  EGL/GBM, which NVIDIA supports from driver 495; it's untested. Nouveau/NVK is untested too.
+- **Which GPU**: virglrenderer opens the first render node itself, so on a machine with two GPUs
+  the guest's OpenGL runs on `renderD128`, often the integrated one; `--render-node` only changes
+  what try.sh checks. Venus lists every Vulkan device of the host, and the guest picks.
+- **No display**: crosvm runs with its stub display, so the guest has a scanout (its X server
+  works) but nothing is shown on the host. AgentBox's agents draw on their own virtual displays,
+  so it's what we'd want, but crosvm's Wayland/X display paths aren't exercised.
+- **virgl's OpenGL** tops out at what virglrenderer translates (OpenGL 4.3 / GLES 3.2 on most
+  hosts) and costs a copy per frame; Venus is near native but needs a guest kernel 5.16 or later
+  with blob resources and context init (Debian 13's 6.12 has them).
+- **Spectrum's patchset** is for Cloud Hypervisor v50.0 and was written for crosvm's
+  cross-domain (Wayland) contexts, Spectrum's use; virgl and Venus contexts over it are what this
+  spike finds out. Snapshot, restore and live migration of a VM with the GPU device weren't tried.
+- **amd64 only**, see build.sh above.
