@@ -1,22 +1,25 @@
 # Patches
 
-Applied by the Dockerfile in name order: `crosvm-*` to crosvm, `cloud-hypervisor-*`
-to Cloud Hypervisor after Spectrum's patchset.
+Applied by the Dockerfile in name order: `crosvm-*` to crosvm, `rutabaga_gfx-*` to
+the rutabaga_gfx crate, `cloud-hypervisor-*` to Cloud Hypervisor after Spectrum's
+patchset.
 
-- `crosvm-0001-gpu-render-node-parameter.patch`: **inert for now**: rutabaga
-  0.1.75's `get_drm_fd` drops every render node (`is_valid_gpu_path` checks
-  `Path::starts_with("/dev/dri/renderD")`, which compares whole components and
-  so is false for `/dev/dri/renderD128`). try.sh keeps crosvm to the node with a
-  mount namespace instead (`lib/gpu-ns.sh`). Ours, not upstream (crosvm's
+- `crosvm-0001-gpu-render-node-parameter.patch`: ours, not upstream (crosvm's
   main has no equivalent). A `render-node` key in `device gpu --params`, added
   as a GPU path for rutabaga, which hands its fd to virglrenderer
   (`get_drm_fd`). Without it virglrenderer renders GL on the first
   `/dev/dri/renderD*` that `readdir` returns, which on a machine with an
   integrated and a discrete GPU was the integrated one while Venus used the
-  discrete one. try.sh passes its `--render-node`, with `"surfaceless": false`:
-  surfaceless, virglrenderer's EGL display is Mesa's default device whatever
-  the fd (it only matches an EGL device to the fd when built against minigbm),
-  so GBM would be on the node and GL still elsewhere.
+  discrete one. try.sh passes its `--render-node`, with `"surfaceless": false`
+  (surfaceless, the EGL display is Mesa's default device whatever the fd).
+- `rutabaga_gfx-0001-accept-render-node-gpu-paths.patch`: ours, for the crate
+  rutabaga_gfx 0.1.75 that crosvm builds with (fetched at the version and
+  checksum crosvm's Cargo.lock pins, then used from a path). Its
+  `is_valid_gpu_path` checked `Path::starts_with("/dev/dri/renderD")`, which
+  compares whole components, so no render node was ever accepted and
+  `get_drm_fd` always fell back to virglrenderer's own pick. The patch
+  compares the path as a string (with a unit test the build runs), and logs
+  the path it takes, or that there was none.
 
 The `cloud-hypervisor-*` ones are upstream commits, unchanged, that v50 lacks:
 
