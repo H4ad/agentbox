@@ -1426,6 +1426,12 @@ let defaultsSettings = {
   claudeCompactWindow: 200_000,
   updateCheck: true,
   usageStats: true,
+  agentGPU: false,
+  // WSL's GPU, or ?gpu=none for a VM with none.
+  vmGPU:
+    typeof location !== 'undefined' && new URLSearchParams(location.search).get('gpu') === 'none'
+      ? { kind: '', node: '', reason: "WSL gives AgentBox's distro no GPU (no /dev/dxg): it needs Windows 10 21H2 or later, a current WSL (wsl --update) and a GPU driver with WSL support" }
+      : { kind: 'dxg', node: '/dev/dxg', reason: '' },
   errorReports: true,
   prWatch: true,
   defaultClaudeCompactWindow: 500_000,
@@ -1483,6 +1489,7 @@ function patchDefaults(req: T.UpdateSettingsRequest): { status: number; body: st
     'claudeCompactWindow',
     'updateCheck',
     'usageStats',
+    'agentGPU',
     'errorReports',
     'prWatch',
     'dockerPruneOnStop',

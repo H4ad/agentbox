@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"agentbox/internal/agent"
 	"agentbox/internal/api"
 	"agentbox/internal/schedule"
 	"agentbox/internal/state"
@@ -235,6 +236,15 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	}
+	if req.AgentGPU != nil {
+		if err := s.store.SetFlag(r.Context(), state.SettingAgentGPU, *req.AgentGPU); err != nil {
+			return err
+		}
+		// It reaches the agents you already have at once.
+		if _, err := s.manager(nil).ApplyGPU(r.Context()); err != nil {
+			return err
+		}
+	}
 	if req.ErrorReports != nil {
 		if err := s.store.SetFlag(r.Context(), state.SettingErrorReports, *req.ErrorReports); err != nil {
 			return err
@@ -415,6 +425,11 @@ func (s *Server) currentSettings(r *http.Request) (api.Settings, error) {
 	if err != nil {
 		return api.Settings{}, err
 	}
+	agentGPU, err := s.store.Flag(r.Context(), state.SettingAgentGPU)
+	if err != nil {
+		return api.Settings{}, err
+	}
+	vmGPU := agent.FindVMGPU()
 	errorReports, err := s.store.FlagOn(r.Context(), state.SettingErrorReports)
 	if err != nil {
 		return api.Settings{}, err
@@ -505,6 +520,8 @@ func (s *Server) currentSettings(r *http.Request) (api.Settings, error) {
 		CreditAITool:         creditAITool,
 		UpdateCheck:          updateCheck,
 		UsageStats:           usageStats,
+		AgentGPU:             agentGPU,
+		VMGPU:                api.VMGPU{Kind: vmGPU.Kind, Node: vmGPU.Node, Reason: vmGPU.Reason},
 		ErrorReports:         errorReports,
 		PRWatch:              prWatch,
 		MediaRetention:       mediaRetention,
