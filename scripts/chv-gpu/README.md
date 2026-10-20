@@ -160,9 +160,16 @@ llvmpipe or fail, as they should with no 3D.
   driver exports them (RADV and ANV do). A blob that can't be exported fails to map in the guest
   and the summary counts it; without `external-blob`, the first such blob (resource 23 on an RX
   6750 XT) made Cloud Hypervisor drop the device and crosvm panic.
-- **Which GPU**: virglrenderer opens the first render node itself, so on a machine with two GPUs
-  the guest's OpenGL runs on `renderD128`, often the integrated one; `--render-node` only changes
-  what try.sh checks. Venus lists every Vulkan device of the host, and the guest picks.
+- **Which GPU**: `--render-node` (default `renderD128`; `--check` lists them) picks the host GPU.
+  - **GL:** our crosvm patch's `render-node` hands virglrenderer that node's fd, and `surfaceless`
+    off makes it take its EGL display from the GBM device on it. Surfaceless, Mesa picks its own
+    default device whatever the fd: an iGPU on an iGPU+dGPU machine. virglrenderer only matches an
+    EGL device to the fd when built against minigbm, not Mesa's libgbm.
+  - **Vulkan:** Venus offers every host GPU, and the guest puts the chosen one first with Mesa's
+    device-select layer, in the guest. On the host, in `virgl_render_server`, that layer breaks
+    Venus: vkr fails `vkEnumeratePhysicalDeviceGroups` with `ERROR_INITIALIZATION_FAILED`.
+  - **The summary** says where each ran: GL from the render node crosvm had open, Vulkan from the
+    vendor:device vkmark used. It flags either one not on the chosen node.
 - **No display**: crosvm runs with its stub display, so the guest has a scanout (its X server
   works) but nothing is shown on the host. AgentBox's agents draw on their own virtual displays,
   so it's what we'd want, but crosvm's Wayland/X display paths aren't exercised.

@@ -9,7 +9,10 @@ to Cloud Hypervisor after Spectrum's patchset.
   (`get_drm_fd`). Without it virglrenderer renders GL on the first
   `/dev/dri/renderD*` that `readdir` returns, which on a machine with an
   integrated and a discrete GPU was the integrated one while Venus used the
-  discrete one. try.sh passes its `--render-node`.
+  discrete one. try.sh passes its `--render-node`, with `"surfaceless": false`:
+  surfaceless, virglrenderer's EGL display is Mesa's default device whatever
+  the fd (it only matches an EGL device to the fd when built against minigbm),
+  so GBM would be on the node and GL still elsewhere.
 
 The `cloud-hypervisor-*` ones are upstream commits, unchanged, that v50 lacks:
 
