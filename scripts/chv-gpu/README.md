@@ -78,6 +78,10 @@ licenses/, VERSIONS, HOST-LIBRARIES, SHA256SUMS
 `libwayland-client`, `libX11`, `libcap`. These aren't bundled on purpose: they must be the host's
 own, matching its Mesa and its GPU driver. Any desktop Linux with Mesa installed has them.
 
+Git sources go through [`fetch-git.sh`](fetch-git.sh): five tries per URL, 2 to 16 seconds
+apart, since chromium.googlesource.com answers 503 now and then, and then Google's GitHub mirrors
+of crosvm and minijail. Whichever serves it, the commit must be the pinned one.
+
 Reproducibility: every source is pinned by commit or SHA-256, Debian's packages by snapshot date,
 the Rust images by digest; paths are remapped, file times set to `SOURCE_DATE_EPOCH`, and the
 tarball written in a fixed order with fixed owners. A build and a `DOCKER_BUILD_FLAGS=--no-cache`

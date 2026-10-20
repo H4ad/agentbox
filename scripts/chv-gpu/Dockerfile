@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 # Builds the GPU spike's binaries; run by build.sh, which passes every pin in
 # versions.env as a build argument. The last stage is only the tarball.
-ARG RUST_IMAGE
+# The default is versions.env's RUST_IMAGE (build.sh checks they match), so
+# FROM has a valid image even before the build arguments arrive.
+ARG RUST_IMAGE=rust:1.88.0-slim-bookworm@sha256:38bc5a86d998772d4aec2348656ed21438d20fcdce2795b56ca434cf21430d89
 FROM ${RUST_IMAGE} AS build
 
 ARG DEBIAN_SNAPSHOT
@@ -34,14 +36,14 @@ ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 WORKDIR /src
 # The install prefix inside the build; the tarball is relocatable.
 ENV PREFIX=/opt/chv-gpu
+# Every git source goes through fetch-git.sh: retries, mirrors, commit check.
+COPY fetch-git.sh /usr/local/bin/fetch-git
 
 # --- virglrenderer, with Venus and its render server -------------------------
 ARG VIRGLRENDERER_REPO
 ARG VIRGLRENDERER_COMMIT
-RUN git init -q virglrenderer && cd virglrenderer && \
-    git fetch -q --depth 1 "$VIRGLRENDERER_REPO" "$VIRGLRENDERER_COMMIT" && \
-    git checkout -q FETCH_HEAD && \
-    test "$(git rev-parse HEAD)" = "$VIRGLRENDERER_COMMIT" && \
+RUN fetch-git virglrenderer "$VIRGLRENDERER_COMMIT" "$VIRGLRENDERER_REPO" && \
+    cd virglrenderer && \
     meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
       -Dvenus=true -Drender-server=true -Dplatforms=egl,glx \
       -Dtests=false -Dc_args=-ffile-prefix-map=/src/= && \
@@ -49,16 +51,16 @@ RUN git init -q virglrenderer && cd virglrenderer && \
 
 # --- crosvm, for `crosvm device gpu` -----------------------------------------
 ARG CROSVM_REPO
+ARG CROSVM_MIRROR
 ARG CROSVM_COMMIT
 ARG MINIJAIL_REPO
+ARG MINIJAIL_MIRROR
 ARG MINIJAIL_COMMIT
-RUN git init -q crosvm && cd crosvm && \
-    git fetch -q --depth 1 "$CROSVM_REPO" "$CROSVM_COMMIT" && git checkout -q FETCH_HEAD && \
-    test "$(git rev-parse HEAD)" = "$CROSVM_COMMIT" && \
+RUN fetch-git crosvm "$CROSVM_COMMIT" "$CROSVM_REPO" "$CROSVM_MIRROR" && \
+    cd crosvm && \
     test "$(git ls-tree HEAD third_party/minijail | awk '{print $3}')" = "$MINIJAIL_COMMIT" && \
-    rmdir third_party/minijail && git init -q third_party/minijail && \
-    git -C third_party/minijail fetch -q --depth 1 "$MINIJAIL_REPO" "$MINIJAIL_COMMIT" && \
-    git -C third_party/minijail checkout -q FETCH_HEAD
+    rmdir third_party/minijail && \
+    fetch-git third_party/minijail "$MINIJAIL_COMMIT" "$MINIJAIL_REPO" "$MINIJAIL_MIRROR"
 RUN cd crosvm && \
     export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" CROSVM_USE_SYSTEM_VIRGLRENDERER=1 && \
     export RUSTFLAGS='-C link-arg=-Wl,-rpath,$ORIGIN/../lib --remap-path-prefix=/src=. --remap-path-prefix=/usr/local/cargo=cargo' && \
