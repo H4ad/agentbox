@@ -67,6 +67,12 @@ RUN fetch-git crosvm "$CROSVM_COMMIT" "$CROSVM_REPO" "$CROSVM_MIRROR" && \
     test "$(git ls-tree HEAD third_party/minijail | awk '{print $3}')" = "$MINIJAIL_COMMIT" && \
     rmdir third_party/minijail && \
     fetch-git third_party/minijail "$MINIJAIL_COMMIT" "$MINIJAIL_REPO" "$MINIJAIL_MIRROR"
+# Our patches to crosvm and the upstream fixes for Cloud Hypervisor
+# (patches/README.md).
+COPY patches/ /src/patches/
+RUN for p in /src/patches/crosvm-*.patch; do \
+      patch -d crosvm -p1 --no-backup-if-mismatch < "$p" || exit 1; \
+    done
 RUN cd crosvm && \
     export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" CROSVM_USE_SYSTEM_VIRGLRENDERER=1 && \
     export RUSTFLAGS='-C link-arg=-Wl,-rpath,$ORIGIN/../lib --remap-path-prefix=/src=. --remap-path-prefix=/usr/local/cargo=cargo' && \
@@ -91,7 +97,6 @@ RUN fetch() { curl -fsSL --retry 5 -o "$1" "$2" && echo "$3  $1" | sha256sum -c 
     patch -d vhost -p1 --no-backup-if-mismatch < spectrum/vhost.patch && \
     patch -d cloud-hypervisor -p1 --no-backup-if-mismatch < spectrum/cloud-hypervisor.patch
 # Upstream fixes v50 lacks, after Spectrum's patchset (patches/README.md).
-COPY patches/ /src/patches/
 RUN for p in /src/patches/cloud-hypervisor-*.patch; do \
       patch -d cloud-hypervisor -p1 --no-backup-if-mismatch < "$p" || exit 1; \
     done

@@ -25,13 +25,13 @@ done
 mkdir -p "$stage/licenses/spectrum-patches"
 cp /src/spectrum/LICENSES/* "$stage/licenses/spectrum-patches/"
 cp /src/spectrum/*.patch "$stage/licenses/spectrum-patches/"
-mkdir -p "$stage/licenses/cloud-hypervisor-backports"
-cp /src/patches/*.patch "$stage/licenses/cloud-hypervisor-backports/"
+mkdir -p "$stage/licenses/patches"
+cp /src/patches/*.patch /src/patches/README.md "$stage/licenses/patches/"
 
 {
-	echo "cloud-hypervisor $CHV_VERSION + Spectrum OS GPU patchset ${CHV_VERSION}-spectrum0 + backports: $(cd /src/patches && ls *.patch | sed 's/^cloud-hypervisor-//; s/\.patch$//' | paste -sd' ') (static, musl)"
+	echo "cloud-hypervisor $CHV_VERSION + Spectrum OS GPU patchset ${CHV_VERSION}-spectrum0 + backports: $(cd /src/patches && ls cloud-hypervisor-*.patch | sed 's/^cloud-hypervisor-//; s/\.patch$//' | paste -sd' ') (static, musl)"
 	echo "vhost $VHOST_URL (patched by the same patchset)"
-	echo "crosvm $CROSVM_COMMIT (minijail $MINIJAIL_COMMIT), features: default + virgl_renderer"
+	echo "crosvm $CROSVM_COMMIT (minijail $MINIJAIL_COMMIT), features: default + virgl_renderer, patched: $(cd /src/patches && ls crosvm-*.patch | sed 's/^crosvm-//; s/\.patch$//' | paste -sd' ')"
 	echo "virglrenderer $VIRGLRENDERER_VERSION ($VIRGLRENDERER_COMMIT): venus, render-server, egl+glx, minigbm_allocation (system libgbm)"
 	echo "built with $(rustc --version) (crosvm), $(rustc "+$CHV_RUST" --version) (Cloud Hypervisor), on Debian 12 (snapshot.debian.org $DEBIAN_SNAPSHOT)"
 } > "$stage/VERSIONS"

@@ -141,6 +141,35 @@ chv_failure() {
 		tail -n 3 <<<"$in" | tr '\n' ' ' | sed 's/ *$//'
 }
 
+# host_gpu RENDERER: the host GPU behind a guest's renderer string, as
+# "name/codename" in lower case, or nothing for one that isn't virgl or Venus.
+# "virgl (AMD Radeon RX 6750 XT (radeonsi, navi22, LLVM 19.1.7, DRM 3.61, ...))"
+# and "Virtio-GPU Venus (AMD Radeon RX 6750 XT (RADV NAVI22))" are both
+# "amd radeon rx 6750 xt/navi22"; the codename is AMD's (radeonsi, RADV) only.
+host_gpu() {
+	local inner name code=''
+	case "$1" in
+	"virgl ("*")") inner=${1#virgl (} ;;
+	"Virtio-GPU Venus ("*")") inner=${1#Virtio-GPU Venus (} ;;
+	*) return 0 ;;
+	esac
+	inner=${inner%)}
+	name=${inner%% (*}
+	name=${name#Mesa }
+	case "$inner" in
+	*"(radeonsi, "*) code=${inner#*(radeonsi, }; code=${code%%[,)]*} ;;
+	*"(RADV "*) code=${inner#*(RADV }; code=${code%%)*} ;;
+	esac
+	printf '%s/%s\n' "${name,,}" "${code,,}"
+}
+
+# same_gpu A B: whether two host_gpu values are the same GPU: the same name,
+# and the same codename when both have one.
+same_gpu() {
+	[ "${1%%/*}" = "${2%%/*}" ] || return 1
+	[ -z "${1#*/}" ] || [ -z "${2#*/}" ] || [ "${1#*/}" = "${2#*/}" ]
+}
+
 # ratio A B: A/B to one decimal, or "?" when either is missing or B is 0.
 ratio() {
 	awk -v a="$1" -v b="$2" 'BEGIN {

@@ -85,6 +85,39 @@ done
 check "vhost-user without shared memory is refused" "$(fake_kvm_run "${bad[@]}")" no \
 	"Using vhost-user requires using shared memory"
 
+# crosvm on try.sh's line (crosvm_command): it binds its socket only once
+# --params parsed, and refuses keys it doesn't know, so this also proves the
+# render-node key (our patch) is there. Nothing connects, so it never opens
+# the render node, which needn't exist.
+crosvm_bound() { # COMMAND...: "bound", or crosvm's last line
+	rm -f "$work/gpu.sock"
+	"$@" > "$tmp/crosvm.log" 2>&1 &
+	local p=$!
+	for _ in $(seq 50); do
+		[ -S "$work/gpu.sock" ] && break
+		kill -0 "$p" 2>/dev/null || break
+		sleep 0.1
+	done
+	if [ -S "$work/gpu.sock" ]; then echo bound; else tail -n 1 "$tmp/crosvm.log"; fi
+	kill "$p" 2>/dev/null
+	wait "$p" 2>/dev/null
+}
+if ldd "$bin/bin/crosvm" | grep -q 'not found'; then
+	echo "skip crosvm (this machine lacks its libraries: $(ldd "$bin/bin/crosvm" | awk '/not found/ {print $1}' | tr '\n' ' '))"
+else
+	render_node=/dev/dri/renderD128
+	crosvm_command
+	echo "try.sh runs: ${crosvm[*]//"$tmp"\//}"
+	got=$(crosvm_bound "${crosvm[@]}")
+	[ "$got" = bound ] && echo "ok   crosvm takes try.sh's --params (render-node included)" ||
+		{ echo "FAIL crosvm on try.sh's line: $got"; failed=1; }
+	bad=("${crosvm[@]}")
+	bad[-1]=${bad[-1]//render-node/render-nodee}
+	got=$(crosvm_bound "${bad[@]}")
+	[ "$got" != bound ] && echo "ok   crosvm refuses an unknown key ($got)" ||
+		{ echo "FAIL crosvm took an unknown --params key"; failed=1; }
+fi
+
 if [ $failed -ne 0 ]; then
 	echo FAILED
 	exit 1

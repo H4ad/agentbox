@@ -8,7 +8,8 @@
 #
 #   --tarball FILE    the tarball build.sh made (default: the one in out/)
 #   --dir DIR         an unpacked tarball instead
-#   --render-node DEV the host's render node (default /dev/dri/renderD128)
+#   --render-node DEV the host GPU to use, for GL and Vulkan (default
+#                     /dev/dri/renderD128; --check lists them)
 #   --cpus N          the guest's CPUs (default 4)
 #   --memory MiB      the guest's memory (default 4096)
 #   --timeout MIN     give up on the guest after this long (default 30)
@@ -126,6 +127,18 @@ check_prereqs() {
 		case "${info%%|*}" in
 		nvidia) echo "  warning: NVIDIA's proprietary driver: virgl may work, Venus is known not to (README)" ;;
 		esac
+	fi
+	local n
+	for n in /dev/dri/renderD*; do
+		[ -e "$n" ] || continue
+		[ "$(readlink -f "$n")" = "$(readlink -f "$render_node")" ] && continue
+		info=$(render_node_info "$n")
+		echo "  also: $n (driver ${info%%|*}, PCI ${info#*|}); --render-node $n to use it"
+	done
+	if device_select_layer; then
+		echo "  Vulkan device-select layer: yes (Venus keeps to the render node's GPU)"
+	else
+		echo "  Vulkan device-select layer: no (Venus offers every GPU; on Arch it's vulkan-mesa-layers)"
 	fi
 	echo "  host Mesa: $(host_mesa)"
 	echo "  host virglrenderer: $(host_virglrenderer) (try.sh uses the tarball's own $VIRGLRENDERER_VERSION)"
@@ -317,6 +330,43 @@ cleanup() {
 	exit "$rc"
 }
 
+# crosvm_command: crosvm's GPU device command line, into the array crosvm.
+crosvm_command() {
+	local node ids params
+	node=$(readlink -f "$render_node")
+	ids=$(render_node_info "$render_node")
+	ids=${ids#*|}
+	# virgl (GL): rendered on the render node (render-node, our crosvm patch:
+	# without it virglrenderer takes whichever renderD* readdir returns first).
+	# Venus (Vulkan) runs in virgl_render_server, which crosvm starts, and
+	# lists every Vulkan device of the host; Mesa's device-select layer, when
+	# the host has it, keeps only the render node's GPU.
+	# external-blob: every blob the guest maps must reach Cloud Hypervisor as
+	# an fd (SHMEM_MAP). Without it crosvm falls back, for GL buffers, to
+	# EXTERNAL_MAP (a pointer into its own memory), which Spectrum's patchset
+	# doesn't implement: Cloud Hypervisor drops the device (InvalidMessage)
+	# and crosvm panics. With it, virglrenderer allocates those buffers with
+	# GBM (built with minigbm_allocation) and exports them as dma-bufs.
+	params=$(printf '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true,"external-blob":true,"render-node":"%s"}' "$node")
+	# Headless: without DISPLAY and WAYLAND_DISPLAY crosvm's display is its
+	# stub, which still gives the guest a scanout for its X server.
+	crosvm=(env -u DISPLAY -u WAYLAND_DISPLAY
+		RENDER_SERVER_EXEC_PATH="$bin/libexec/virgl_render_server")
+	if [ "$ids" != "?" ]; then
+		crosvm+=(MESA_VK_DEVICE_SELECT="$ids" MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE=1)
+	fi
+	crosvm+=("$bin/bin/crosvm" --no-syslog device gpu --socket-path "$work/gpu.sock" --params "$params")
+}
+
+# device_select_layer: whether the host has Mesa's Vulkan device-select layer.
+device_select_layer() {
+	local d
+	for d in /usr/share/vulkan/implicit_layer.d /etc/vulkan/implicit_layer.d /usr/local/share/vulkan/implicit_layer.d; do
+		ls "$d"/*device_select*.json >/dev/null 2>&1 && return 0
+	done
+	return 1
+}
+
 # chv_command: Cloud Hypervisor's command line, into the array chv. Its
 # options are v50's (the patchset's release), not those of the v53 AgentBox's
 # VM runs: v50's --disk has no image_type or sparse, for one.
@@ -341,20 +391,8 @@ run_guest() {
 	start passt "$passt" --vhost-user --socket "$work/passt.sock" --foreground \
 		--tcp-ports none --udp-ports none
 	wait_for_socket "$work/passt.sock" "${pid[passt]}" passt
-	# Headless: without DISPLAY and WAYLAND_DISPLAY crosvm's display is its
-	# stub, which still gives the guest a scanout for its X server.
-	# virglrenderer finds the render node itself (the first one, renderD128);
-	# Venus runs in virgl_render_server, which crosvm starts.
-	# external-blob: every blob the guest maps must reach Cloud Hypervisor as
-	# an fd (SHMEM_MAP). Without it crosvm falls back, for GL buffers, to
-	# EXTERNAL_MAP (a pointer into its own memory), which Spectrum's patchset
-	# doesn't implement: Cloud Hypervisor drops the device (InvalidMessage)
-	# and crosvm panics. With it, virglrenderer allocates those buffers with
-	# GBM (built with minigbm_allocation) and exports them as dma-bufs.
-	start crosvm env -u DISPLAY -u WAYLAND_DISPLAY \
-		RENDER_SERVER_EXEC_PATH="$bin/libexec/virgl_render_server" \
-		"$bin/bin/crosvm" --no-syslog device gpu --socket-path "$work/gpu.sock" \
-		--params '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true,"external-blob":true}'
+	crosvm_command
+	start crosvm "${crosvm[@]}"
 	wait_for_socket "$work/gpu.sock" "${pid[crosvm]}" crosvm
 	chv_command
 	# A panic's backtrace goes to its log, for whoever reads it with --keep.
@@ -465,6 +503,13 @@ summary() {
 		*) problem "$name: exit $rc: $(section "$tmp" "$name" | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-160)" ;;
 		esac
 	done
+	local gl_host vk_host
+	gl_host=$(host_gpu "${gl_gpu%%|*}")
+	IFS='|' read -r _ _ vk_host _ <<<"$vk_gpu"
+	vk_host=$(host_gpu "$vk_host")
+	if [ -n "$gl_host" ] && [ -n "$vk_host" ] && ! same_gpu "$gl_host" "$vk_host"; then
+		problem "GL and Vulkan ran on different host GPUs: GL on ${gl_host%/}, Vulkan on ${vk_host%/}"
+	fi
 	is_software "${gl_gpu%%|*}" && problem "GL with the GPU fell back to software (${gl_gpu%%|*})"
 	[[ ${vk_gpu} == *"|cpu|"* ]] && problem "Vulkan with the GPU is the CPU (${vk_gpu})"
 	[ -n "$(section "$tmp" xorg)" ] && problem "Xorg didn't start: $(section "$tmp" xorg | grep -E '\(EE\)' | head -n 2 | tr '\n' ' ')"
@@ -525,9 +570,6 @@ main() {
 		esac
 		shift
 	done
-	# virglrenderer opens the first render node itself.
-	[ "$render_node" = /dev/dri/renderD128 ] ||
-		echo "note: crosvm's virglrenderer opens the first render node (renderD128) whatever --render-node says" >&2
 
 	check_prereqs || die "prerequisites missing (above)"
 	$check_only && exit 0

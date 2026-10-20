@@ -106,6 +106,15 @@ has "blobs: unexportable ones counted" "${problems[*]}" "2 blob(s) couldn't be e
 problems=()
 blob_problems "$fx/glxinfo-sw.txt"
 eq "blobs: none" "${#problems[@]}" "0"
+eq "host gpu: virgl" "$(host_gpu "virgl (AMD Radeon RX 6750 XT (radeonsi, navi22, LLVM 19.1.7, DRM 3.61, 6.17.1))")" "amd radeon rx 6750 xt/navi22"
+eq "host gpu: venus" "$(host_gpu "Virtio-GPU Venus (AMD Radeon RX 6750 XT (RADV NAVI22))")" "amd radeon rx 6750 xt/navi22"
+eq "host gpu: the iGPU" "$(host_gpu "virgl (AMD Radeon Graphics (radeonsi, raphael, LLVM 19.1.7, DRM 3.61, 6.17.1))")" "amd radeon graphics/raphael"
+eq "host gpu: intel, Mesa's prefix dropped" "$(host_gpu "virgl (Mesa Intel(R) UHD Graphics 630 (CFL GT2))")" "intel(r) uhd graphics 630/"
+eq "host gpu: not virgl or venus" "$(host_gpu "llvmpipe (LLVM 19.1.7, 256 bits)")" ""
+same_gpu "amd radeon rx 6750 xt/navi22" "amd radeon rx 6750 xt/navi22" && eq "same gpu" yes yes || eq "same gpu" no yes
+same_gpu "amd radeon graphics/raphael" "amd radeon rx 6750 xt/navi22" && eq "different gpus" same different || eq "different gpus" different different
+same_gpu "intel(r) uhd graphics 630/" "intel(r) uhd graphics 630/" && eq "same gpu, no codename" yes yes || eq "same gpu, no codename" no yes
+same_gpu "amd radeon graphics/raphael" "amd radeon graphics/phoenix" && eq "same name, other chip" same different || eq "same name, other chip" different different
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
 eq "ratio by zero" "$(ratio 5 0)" "?"
@@ -185,6 +194,12 @@ has "summary: glmark2" "$out" "glmark2:         GPU 8015, software 4381 (x1.8)"
 has "summary: vkmark" "$out" "vkmark:          GPU 21544, software 3124 (x6.9)"
 has "summary: no problems" "$out" "problems:        none"
 eq "summary: ends with its rule" "$(tail -n1 <<<"$out")" "-----"
+
+# GL on the iGPU, Venus on the discrete one (a user's first working run).
+serial guest:guest-info.txt:0 glxinfo-gpu:glxinfo-virgl-igpu.txt:0 vulkaninfo-gpu:vulkaninfo-venus.txt:0 > "$tmp/split"
+problems=()
+out=$(summary "$tmp/split")
+has "split: says so" "$out" "  - GL and Vulkan ran on different host GPUs: GL on amd radeon graphics/raphael, Vulkan on amd radeon rx 6600/navi23"
 
 # Venus failing, glmark2 on the GPU falling back to llvmpipe.
 serial guest:guest-info.txt:0 glxinfo-gpu:glxinfo-sw.txt:0 eglinfo-gpu:eglinfo-sw.txt:0 \
