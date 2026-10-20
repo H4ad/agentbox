@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"agentbox/internal/bridgecheck"
 	"agentbox/internal/dockerfw"
 	"agentbox/internal/incus"
 )
@@ -304,6 +305,12 @@ type Options struct {
 // tests replace it so they never touch this machine's.
 var firewall dockerfw.Run = dockerfw.System
 
+// checkBridge makes sure containers on the Incus bridge reach the internet;
+// tests replace it so they never touch this machine's bridge.
+var checkBridge = func(ctx context.Context, inc incus.Client) (bridgecheck.Result, error) {
+	return bridgecheck.Check(ctx, bridgecheck.System(inc))
+}
+
 // readyTimeout is how long an instance gets to boot and take an address.
 const readyTimeout = 2 * time.Minute
 
@@ -327,6 +334,13 @@ func Build(ctx context.Context, inc incus.Client, u User, opts Options, log io.W
 		step("Let Docker's firewall pass %s: added %d %s rule(s)", dockerfw.Bridge, n, dockerfw.Chain)
 	} else if err != nil && !errors.Is(err, dockerfw.ErrNoTool) {
 		step("Could not let Docker's firewall pass %s: %v", dockerfw.Bridge, err)
+	}
+	// Nor may its DNS, IPv6 or MTU work though this machine's do (on WSL
+	// especially), which stalls the build at its first download.
+	if res, err := checkBridge(ctx, inc); err != nil {
+		step("Could not check %s: %v", bridgecheck.Bridge, err)
+	} else if res.Message != "" {
+		step("%s", res.Message)
 	}
 	// Build under another name and swap it in at the end: agents can still be
 	// created from the current image meanwhile, and a failed build keeps it.

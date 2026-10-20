@@ -24,6 +24,7 @@ import (
 
 	"agentbox/internal/agent"
 	"agentbox/internal/api"
+	"agentbox/internal/bridgecheck"
 	"agentbox/internal/credentials"
 	"agentbox/internal/image"
 	"agentbox/internal/incus"
@@ -100,6 +101,9 @@ type testConfig struct {
 func TestMain(m *testing.M) {
 	firewall = func(context.Context, string, ...string) ([]byte, error) {
 		return nil, errors.New("no firewall in tests")
+	}
+	checkBridge = func(context.Context, incus.Client) (bridgecheck.Result, error) {
+		return bridgecheck.Result{}, nil
 	}
 	// The tests' daemons listen on their own paths.Paths, never on a socket
 	// the developer's shell points at.
