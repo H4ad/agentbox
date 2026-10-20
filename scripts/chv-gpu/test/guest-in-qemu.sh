@@ -6,6 +6,7 @@
 # (cloud-init, the packages, Xorg, the framing, the parsing) is what's checked.
 #
 #   scripts/chv-gpu/test/guest-in-qemu.sh [--keep]
+# shellcheck disable=SC2034,SC2154 # try.sh's globals
 set -euo pipefail
 
 tdir=$(cd "$(dirname "$0")" && pwd)

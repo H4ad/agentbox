@@ -71,7 +71,7 @@ icd=/usr/share/vulkan/icd.d
 	run glmark2-sw 300 glmark2 "${glmark[@]}"
 	run vkmark-sw 300 vkmark "${vkmark[@]}"
 )
-run dmesg-tail 10 sh -c "dmesg | grep -iE 'virtio|drm|gpu|venus|fault|error' | tail -n 30"
+run dmesg-tail 10 sh -c "dmesg | grep -iE 'virtio|drm|gpu|venus|fault' | tail -n 30"
 
 # Quiet the kernel on the console so nothing lands inside the results.
 dmesg -n 1

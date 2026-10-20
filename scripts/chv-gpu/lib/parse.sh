@@ -7,6 +7,7 @@
 # the serial console's carriage returns taken out. Nothing when the guest
 # never got to the end marker.
 results() {
+	[ -r "$1" ] || return 1
 	tr -d '\r' < "$1" | awk '
 		/^CHVGPU-BEGIN$/ { on = 1; buf = ""; next }
 		/^CHVGPU-END$/   { if (on) { printf "%s", buf; done = 1 } on = 0; next }
@@ -114,9 +115,9 @@ bench_renderer() {
 }
 
 # drm_features FILE: the virtio-gpu features the guest's kernel found, from
-# its "[drm] features: +virgl +edid +resource_blob ..." line.
+# its "[drm] features: +virgl +edid ..." lines (it prints them over two).
 drm_features() {
-	sed -n 's/.*\[drm\] features: *//p' "$1" | head -n1 | sed 's/[ \t]*$//'
+	sed -n 's/.*\[drm\] features: *//p' "$1" | tr -s ' \t\n' ' ' | sed 's/^ //; s/ $//'
 }
 
 # ratio A B: A/B to one decimal, or "?" when either is missing or B is 0.

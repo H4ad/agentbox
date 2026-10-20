@@ -83,6 +83,8 @@ eq "glmark2 renderer" "$(bench_renderer "$fx/glmark2-sw.txt")" "llvmpipe (LLVM 1
 eq "vkmark device" "$(bench_renderer "$fx/vkmark-venus.txt")" "Virtio-GPU Venus (AMD Radeon RX 6600 (RADV NAVI23))"
 
 eq "drm features" "$(drm_features "$fx/guest-info.txt")" "+virgl +edid +resource_blob +host_visible +context_init"
+eq "drm features over two lines" "$(section "$fx/results-qemu.txt" guest | drm_features -)" \
+	"-virgl +edid -resource_blob -host_visible -context_init"
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
 eq "ratio by zero" "$(ratio 5 0)" "?"
@@ -188,11 +190,26 @@ has "no X: GL failed" "$out" "GL (GPU):         failed"
 has "no X: the runs that never happened" "$out" "  - glmark2-gpu: didn't run"
 has "no X: guest kernel lines" "$out" "  [ 10.0] virtio_gpu_dequeue_ctrl_func: response 0x1203 (command 0x10c)"
 
+# A real run: QEMU's 2D virtio GPU (test/guest-in-qemu.sh), so no virgl or Venus.
+{ echo CHVGPU-BEGIN; cat "$fx/results-qemu.txt"; echo CHVGPU-END; } > "$tmp/qemu"
+problems=()
+out=$(summary "$tmp/qemu")
+has "qemu: guest" "$out" "kernel 6.12.107+deb13-amd64, Mesa 25.0.7-2+deb13u1"
+has "qemu: Venus failed" "$out" "  - vulkaninfo-gpu: exit 1: ERROR at ./vulkaninfo/./vulkaninfo.h:247:vkEnumeratePhysicalDevices failed with ERROR_INITIALIZATION_FAILED"
+has "qemu: GL fell back" "$out" "  - GL with the GPU fell back to software"
+has "qemu: software Vulkan" "$out" "Vulkan (software): llvmpipe (LLVM 19.1.7, 256 bits); llvmpipe (cpu), Vulkan 1.4.305"
+has "qemu: scores" "$out" "glmark2:         GPU 23, software 29 (x0.8)"
+
 # The guest never finished.
 problems=()
 out=$(summary "$tmp/cut")
 has "no results: says so" "$out" "  - no results from the guest (see the serial log with --keep)"
 hasnt "no results: no per-run noise" "$out" "didn't run"
+has "no results: guest" "$out" "guest:       no results"
+problems=()
+out=$(summary "$tmp/nonexistent" 2>&1)
+has "no serial log at all" "$out" "  - no results from the guest"
+hasnt "no serial log: no shell errors" "$out" "No such file"
 
 # --- the guest's user-data ---------------------------------------------------
 

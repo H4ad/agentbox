@@ -350,7 +350,7 @@ run_guest() {
 # progress SERIAL_LOG: a word on how far the guest has got.
 progress() {
 	local s
-	s=$(tr -d '\r' < "$1" 2>/dev/null | grep -aoE 'Cloud-init v\. [^ ]+ (running|finished)[^.]*|Reached target [A-Za-z -]+|login:' | tail -n1 || true)
+	s=$(tr -d '\r' 2>/dev/null < "$1" | grep -aoE 'Cloud-init v\. [^ ]+ (running|finished)[^.]*|Reached target [A-Za-z -]+|login:' | tail -n1 || true)
 	echo "$s"
 }
 
@@ -371,7 +371,11 @@ summary() {
 	echo "host Mesa:   ${host_mesa_v:-?}; host Vulkan: ${host_vulkan_v:-?}"
 	echo "virglrenderer: host ${host_virgl_v:-?}; used: bundled $VIRGLRENDERER_VERSION"
 	echo "binaries:    ${binaries:-?}"
-	echo "guest:       $(kv "$tmp" os), kernel $(kv "$tmp" kernel), Mesa $(kv "$tmp" mesa)"
+	if [ -s "$tmp" ]; then
+		echo "guest:       $(kv "$tmp" os), kernel $(kv "$tmp" kernel), Mesa $(kv "$tmp" mesa)"
+	else
+		echo "guest:       no results"
+	fi
 	feats=$(section "$tmp" guest | drm_features -)
 	echo "virtio-gpu:  ${feats:-no [drm] features line}"
 

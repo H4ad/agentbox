@@ -1,4 +1,6 @@
 *-sw.txt and eglinfo-sw.txt: real output of Debian 13's tools (llvmpipe and
-lavapipe, under Xvfb). *-virgl.txt, *-venus.txt, vulkaninfo-fail.txt and
-guest-info.txt are written by hand in the same shape, for the GPU paths: no
-machine here has a GPU. Replace them with real ones from a try.sh --keep run.
+lavapipe, under Xvfb). results-qemu.txt: a real guest's results, from
+test/guest-in-qemu.sh (QEMU's 2D virtio GPU, so no virgl or Venus).
+*-virgl.txt, *-venus.txt, vulkaninfo-fail.txt and guest-info.txt are written
+by hand in the same shape, for the GPU paths: no machine here has a GPU.
+Replace them with real ones from a try.sh --keep run.
