@@ -52,14 +52,15 @@ problem() { problems+=("$*"); }
 pkg_version() {
 	local p v
 	for p; do
-		if command -v dpkg-query >/dev/null; then
-			v=$(dpkg-query -W -f '${Version}' "$p" 2>/dev/null || true)
-		elif command -v rpm >/dev/null; then
-			v=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$p" 2>/dev/null | grep -v 'not installed' || true)
-		elif command -v pacman >/dev/null; then
+		v=''
+		# Each package manager in turn: some hosts have more than one.
+		command -v dpkg-query >/dev/null &&
+			v=$(dpkg-query -W -f '${db:Status-Status} ${Version}' "$p" 2>/dev/null | sed -n 's/^installed //p' || true)
+		[ -z "$v" ] && command -v pacman >/dev/null &&
 			v=$(pacman -Q "$p" 2>/dev/null | awk '{print $2}' || true)
-		fi
-		[ -n "${v:-}" ] && { echo "$v"; return; }
+		[ -z "$v" ] && command -v rpm >/dev/null &&
+			v=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$p" 2>/dev/null | grep -v 'not installed' || true)
+		[ -n "$v" ] && { echo "$v"; return; }
 	done
 }
 
@@ -135,8 +136,11 @@ check_prereqs() {
 	if [ ${#missing[@]} -gt 0 ]; then
 		echo "  missing: ${missing[*]}"; fatal=1
 	fi
-	command -v passt >/dev/null && echo "  passt: $(command -v passt)" ||
-		echo "  passt: not installed; try.sh will download passt.top's latest static build"
+	if command -v passt >/dev/null && passt --help 2>&1 | grep -q -- '--vhost-user'; then
+		echo "  passt: $(command -v passt)"
+	else
+		echo "  passt: none with --vhost-user here; try.sh will download passt.top's latest static build"
+	fi
 	return $fatal
 }
 
@@ -175,8 +179,10 @@ fetch() {
 	mv "$file.part" "$file"
 }
 
+# passt_bin: a passt with vhost-user (passt 2025 and later): the host's own,
+# or passt.top's latest static build, cached.
 passt_bin() {
-	if command -v passt >/dev/null; then
+	if command -v passt >/dev/null && passt --help 2>&1 | grep -q -- '--vhost-user'; then
 		command -v passt
 		return
 	fi
@@ -213,28 +219,46 @@ runcmd:
 EOF
 }
 
-# seed_tool: the first tool here that can write a NoCloud seed.
+# tool NAME: NAME's path, also looking in the sbin directories a user's PATH
+# often lacks (Debian and Fedora keep mkfs.vfat there).
+tool() {
+	local d
+	command -v "$1" 2>/dev/null && return
+	for d in /usr/sbin /sbin /usr/local/sbin; do
+		[ -x "$d/$1" ] && { echo "$d/$1"; return; }
+	done
+	return 1
+}
+
+# seed_tool: the first tool here that can write a NoCloud seed, or the one
+# CHVGPU_SEED_TOOL names (test/seed_test.sh tries each).
 seed_tool() {
 	local t
-	for t in cloud-localds genisoimage mkisofs xorriso; do
-		command -v "$t" >/dev/null && { echo "$t"; return 0; }
+	for t in ${CHVGPU_SEED_TOOL:-cloud-localds genisoimage mkisofs xorriso mkfs.vfat}; do
+		case "$t" in
+		mkfs.vfat) tool mkfs.vfat >/dev/null && tool mcopy >/dev/null && { echo "$t"; return 0; } ;;
+		*) tool "$t" >/dev/null && { echo "$t"; return 0; } ;;
+		esac
 	done
-	command -v mkfs.vfat >/dev/null && command -v mcopy >/dev/null && { echo mkfs.vfat; return 0; }
 	return 1
 }
 
 # make_seed DIR OUT: the NoCloud seed (volume "cidata") from DIR's user-data
 # and meta-data.
 make_seed() {
-	local d=$1 out=$2
-	case "$(seed_tool)" in
-	cloud-localds) cloud-localds "$out" "$d/user-data" "$d/meta-data" ;;
-	genisoimage | mkisofs) "$(seed_tool)" -quiet -output "$out" -volid cidata -joliet -rock "$d/user-data" "$d/meta-data" ;;
-	xorriso) xorriso -as mkisofs -quiet -output "$out" -volid cidata -joliet -rock "$d/user-data" "$d/meta-data" ;;
+	local d=$1 out=$2 t
+	t=$(seed_tool) || die "no tool to write the cloud-init seed with"
+	case "$t" in
+	cloud-localds) "$(tool cloud-localds)" "$out" "$d/user-data" "$d/meta-data" ;;
+	genisoimage | mkisofs)
+		"$(tool "$t")" -quiet -output "$out" -volid cidata -joliet -rock "$d/user-data" "$d/meta-data" ;;
+	xorriso)
+		"$(tool xorriso)" -as mkisofs -quiet -output "$out" -volid cidata -joliet -rock "$d/user-data" "$d/meta-data" ;;
 	mkfs.vfat)
+		rm -f "$out"
 		truncate -s 2M "$out"
-		mkfs.vfat -n CIDATA "$out" >/dev/null
-		mcopy -i "$out" "$d/user-data" "$d/meta-data" ::
+		"$(tool mkfs.vfat)" -n CIDATA "$out" >/dev/null
+		"$(tool mcopy)" -i "$out" "$d/user-data" "$d/meta-data" ::
 		;;
 	esac
 }
@@ -293,6 +317,23 @@ cleanup() {
 	exit "$rc"
 }
 
+# chv_command: Cloud Hypervisor's command line, into the array chv. Its
+# options are v50's (the patchset's release), not those of the v53 AgentBox's
+# VM runs: v50's --disk has no image_type or sparse, for one.
+# test/chv_args_test.sh runs the tarball's binary on exactly this.
+chv_command() {
+	# shared=on: vhost-user devices (passt, the GPU) map the guest's memory.
+	chv=("$bin/bin/cloud-hypervisor"
+		--api-socket "path=$work/api.sock"
+		--firmware "$cache/CLOUDHV.fd"
+		--cpus "boot=$cpus"
+		--memory "size=${memory}M,shared=on"
+		--disk "path=$work/disk.raw" "path=$work/seed.img,readonly=on"
+		--net "vhost_user=true,socket=$work/passt.sock,vhost_mode=client"
+		--gpu "socket=$work/gpu.sock"
+		--serial "file=$work/serial.log" --console off)
+}
+
 run_guest() {
 	local passt
 	passt=$(passt_bin)
@@ -309,16 +350,8 @@ run_guest() {
 		"$bin/bin/crosvm" --no-syslog device gpu --socket-path "$work/gpu.sock" \
 		--params '{"context-types":"virgl:virgl2:venus","egl":true,"vulkan":true,"implicit-render-server":true}'
 	wait_for_socket "$work/gpu.sock" "${pid[crosvm]}" crosvm
-	# shared=on: vhost-user devices (passt, the GPU) map the guest's memory.
-	start cloud-hypervisor "$bin/bin/cloud-hypervisor" \
-		--api-socket "path=$work/api.sock" \
-		--firmware "$cache/CLOUDHV.fd" \
-		--cpus "boot=$cpus" \
-		--memory "size=${memory}M,shared=on" \
-		--disk "path=$work/disk.raw,image_type=raw" "path=$work/seed.img,image_type=raw,readonly=on,sparse=off" \
-		--net "vhost_user=true,socket=$work/passt.sock,vhost_mode=client" \
-		--gpu "socket=$work/gpu.sock" \
-		--serial "file=$work/serial.log" --console off
+	chv_command
+	start cloud-hypervisor "${chv[@]}"
 
 	say "Booting; the guest installs Mesa and the benchmarks, then runs them (a few minutes)"
 	local deadline=$((SECONDS + timeout_min * 60)) shown='' crosvm_gone=''

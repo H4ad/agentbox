@@ -51,7 +51,7 @@ tarball carries each project's licence files under `licenses/` and Spectrum's pa
 
 try.sh downloads, on the machine it runs on and not into the tarball: Debian 13's generic cloud
 image `20260914-2601` (the build AgentBox's VM uses; Debian's own licences), Cloud Hypervisor's
-EDK2 firmware `ch-97eeb7b09` (BSD-2-Clause-Patent), and passt (GPL-2.0-or-later) when the host
+EDK2 firmware `ch-a54f262b09`, the build CHV v50's own tests boot (BSD-2-Clause-Patent), and passt (GPL-2.0-or-later) when the host
 has none.
 
 ## build.sh
@@ -127,8 +127,19 @@ files, sockets and processes aren't touched, and it can run at the same time.
 
 ```bash
 scripts/chv-gpu/test/parse_test.sh        # the parsing and the summary, against fixtures/
+scripts/chv-gpu/test/chv_args_test.sh     # the tarball's cloud-hypervisor on try.sh's command line
+scripts/chv-gpu/test/seed_test.sh         # the cloud-init seed, with each tool installed
 scripts/chv-gpu/test/guest-in-qemu.sh     # the guest half under QEMU, no GPU or KVM needed
 ```
+
+`chv_args_test.sh` proves Cloud Hypervisor v50 parses and validates the command line try.sh gives
+it (`chv_command`), with no KVM. v50's options aren't v53's (AgentBox's VM): its `--disk` has no
+`image_type` or `sparse`. v50 opens `/dev/kvm` and checks its API version before it reads its
+options, so the test runs it in a user and mount namespace where `/dev/kvm` is an empty file,
+under [`fake-kvm`](test/fake-kvm.c). That ptrace supervisor answers `KVM_GET_API_VERSION` and lets
+every other KVM ioctl fail. The first one after parsing, as the VM is created, ends the run and
+proves the options got through. The test also checks that the harness catches `image_type` and
+vhost-user without shared memory. It needs `gcc` and unprivileged user namespaces.
 
 `guest-in-qemu.sh` boots the same image, seed and guest script under QEMU with its 2D virtio GPU:
 cloud-init, the packages, Xorg, the framing and the summary are checked; the GPU runs fall back to
