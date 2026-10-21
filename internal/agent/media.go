@@ -97,6 +97,9 @@ func (m *Manager) MediaPath(item state.Media) string {
 type pendingMedia struct {
 	item state.Media
 	dir  string
+	// keep is for content that exists nowhere else, a recording: should it
+	// fail to be saved, its file stays, and the error says where.
+	keep bool
 }
 
 func (m *Manager) startMedia(a state.Agent, kind, name, source string) (*pendingMedia, error) {
@@ -115,13 +118,34 @@ func (m *Manager) startMedia(a state.Agent, kind, name, source string) (*pending
 	}}, nil
 }
 
-func (p *pendingMedia) discard() { _ = os.RemoveAll(p.dir) }
+func (p *pendingMedia) discard() { _ = removeTree(p.dir) }
+
+// removeTree is os.RemoveAll for what was pulled out of an agent, which keeps
+// the modes it had there: a directory without write permission, like a
+// read-only report or a Go module cache, can't be emptied until it is given
+// it back.
+func removeTree(path string) error {
+	err := os.RemoveAll(path)
+	if err == nil || !errors.Is(err, fs.ErrPermission) {
+		return err
+	}
+	_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			_ = os.Chmod(p, 0o700)
+		}
+		return nil
+	})
+	return os.RemoveAll(path)
+}
 
 // saveMedia records the item. file is its file or directory inside p.dir, or ""
 // for a note.
 func (m *Manager) saveMedia(ctx context.Context, p *pendingMedia, file string, meta MediaMeta) (state.Media, error) {
 	item := p.item
 	fail := func(err error) (state.Media, error) {
+		if p.keep && file != "" {
+			return state.Media{}, fmt.Errorf("saving %s: %w (its file is kept at %s)", item.Kind, err, file)
+		}
 		p.discard()
 		return state.Media{}, err
 	}
@@ -430,11 +454,11 @@ dir="$HOME/%[1]s"
 out=%[2]s
 mkdir -p "$dir"
 if [ -f "$dir/recording.pid" ] && kill -0 "$(cat "$dir/recording.pid")" 2>/dev/null; then echo "a recording is already running: stop it first" >&2; exit 1; fi
-rm -f "$dir"/recording.* "$out"
+rm -f "$dir"/recording.* "$out" "$out.part"
 %[3]s
 echo $! >"$dir/recording.pid"
 %[5]s
-kill -0 "$(cat "$dir/recording.pid")" 2>/dev/null && [ -n "$target" ] || { echo "the recording didn't start:" >&2; tail -n 5 "$dir/recording.log" >&2; kill "$(cat "$dir/recording.pid")" 2>/dev/null || true; rm -f "$dir"/recording.* "$out"; exit 1; }
+kill -0 "$(cat "$dir/recording.pid")" 2>/dev/null && [ -n "$target" ] || { echo "the recording didn't start:" >&2; tail -n 5 "$dir/recording.log" >&2; kill "$(cat "$dir/recording.pid")" 2>/dev/null || true; rm -f "$dir"/recording.* "$out" "$out.part"; exit 1; }
 printf '%%s' %[4]s | sed "s/\"target\":\"[a-z]*\"/\"target\":\"$target\"/" >"$dir/recording.json"
 echo "$target"`,
 		agentStateDir, out, recorder, shellQuote(string(encoded)), started), nil
@@ -500,14 +524,28 @@ dir="$HOME/%s"
 out="$dir/recording.mp4"
 if grep -q '"staged":true' "$dir/recording.json"; then out="$dir/out/recording.mp4"; fi
 pid=$(cat "$dir/recording.pid" 2>/dev/null || true)
+running=no
 if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  running=yes
   # Both finish the file when told to stop. scrcpy ignores INT, which a
   # background process starts out ignoring, so it gets TERM.
   if grep -q '"target":"android"' "$dir/recording.json"; then kill -TERM "$pid"; else kill -INT "$pid"; fi
   i=0
   while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 500 ]; do sleep 0.05; i=$((i + 1)); done
+  # One that hasn't finished in 25s won't: what it wrote is in its part.
+  if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; echo "the recorder didn't finish in 25s and was killed" >>"$dir/recording.log"; fi
 fi
-[ -s "$out" ] || { echo "the recording is empty:" >&2; tail -n 5 "$dir/recording.log" >&2; rm -f "$dir"/recording.* "$out"; exit 1; }
+# A recorder that was killed or crashed left what it captured in its part,
+# which plays up to its last second: remuxed with its index first, as the
+# recorder would have, or kept as it is.
+if [ ! -s "$out" ] && [ -s "$out.part" ]; then
+  if ffmpeg -hide_banner -loglevel error -nostdin -i "$out.part" -c copy -movflags +faststart -f mp4 -y "$out.tmp" 2>>"$dir/recording.log"; then mv -f "$out.tmp" "$out"; rm -f "$out.part"; else rm -f "$out.tmp"; mv -f "$out.part" "$out"; fi
+fi
+[ -s "$out" ] || {
+  if [ "$running" = no ]; then echo "nothing was recorded: the recorder had already stopped by itself. Its log:" >&2; else echo "nothing was recorded. The recorder's log:" >&2; fi
+  tail -n 5 "$dir/recording.log" >&2
+  rm -f "$dir/recording.json" "$dir/recording.pid" "$out" "$out.part"; exit 1
+}
 cat "$dir/recording.json"
 echo
 if [ -s "$dir/recording.cuts" ]; then printf 'cuts '; cat "$dir/recording.cuts"; echo; fi
@@ -547,27 +585,47 @@ func (m *Manager) StopRecording(ctx context.Context, a state.Agent) (state.Media
 		}
 	}
 
+	remote := home + "/" + agentStateDir
+	inAgent := remote + "/recording.mp4"
+	if st.Staged {
+		inAgent = remote + "/out/recording.mp4"
+	}
+	// Until the recording is kept, nothing captured is removed: a failure
+	// below leaves it where the error says it is.
 	p, err := m.startMedia(a, MediaRecording, st.Name, st.Source)
 	if err != nil {
-		return state.Media{}, err
+		return state.Media{}, fmt.Errorf("keeping the recording: %w (it is still in the agent, at %s)", err, inAgent)
 	}
 	p.item.CreatedAt = st.StartedAt
+	p.keep = true
 	file := filepath.Join(p.dir, fileName(st.Name, "recording", ".mp4"))
-	remote := home + "/" + agentStateDir
-	defer func() {
-		_, _ = m.Incus.Exec(context.WithoutCancel(ctx), a.Instance, "sh", "-c", "rm -f "+remote+"/recording.* "+remote+"/input.*")
-	}()
 	if st.Staged {
 		err = takeStaged(filepath.Join(m.recordingStage(a), "recording.mp4"), file)
+		if err != nil && !errors.Is(err, errStagedNotFile) {
+			// The stage wasn't mounted when it started (it isn't required),
+			// so the agent wrote to its own disk instead.
+			if pullErr := m.Incus.PullFile(ctx, a.Instance, inAgent, file); pullErr == nil {
+				err = nil
+			} else {
+				err = fmt.Errorf("%w, nor could it be copied out of the agent: %w", err, pullErr)
+			}
+		}
 	} else {
-		err = m.Incus.PullFile(ctx, a.Instance, remote+"/recording.mp4", file)
+		err = m.Incus.PullFile(ctx, a.Instance, inAgent, file)
 	}
 	if err != nil {
 		p.discard()
+		return state.Media{}, fmt.Errorf("keeping the recording: %w (it is still in the agent, at %s)", err, inAgent)
+	}
+	item, err := m.saveMedia(ctx, p, file, meta)
+	if err != nil {
 		return state.Media{}, err
 	}
-	return m.saveMedia(ctx, p, file, meta)
+	_, _ = m.Incus.Exec(context.WithoutCancel(ctx), a.Instance, "sh", "-c", "rm -f "+remote+"/recording.* "+remote+"/input.*")
+	return item, nil
 }
+
+var errStagedNotFile = errors.New("the recording the agent left isn't a file")
 
 // takeStaged moves a recording the agent wrote to its stage into the item it
 // is kept as. The agent could have left anything there, so it has to be a
@@ -580,7 +638,7 @@ func takeStaged(staged, file string) error {
 	}
 	if !info.Mode().IsRegular() {
 		_ = os.Remove(staged)
-		return errors.New("the recording the agent left isn't a file")
+		return errStagedNotFile
 	}
 	return os.Rename(staged, file)
 }
@@ -739,10 +797,17 @@ func (m *Manager) DeleteMedia(ctx context.Context, item state.Media) error {
 		return err
 	}
 	if old := m.legacyMediaDir(); old != "" {
-		_ = os.RemoveAll(filepath.Join(old, item.Project, item.Agent, item.ID))
+		_ = removeTree(filepath.Join(old, item.Project, item.Agent, item.ID))
 	}
-	return os.RemoveAll(filepath.Join(m.MediaDir(item.Project, item.Agent), item.ID))
+	if err := removeTree(filepath.Join(m.MediaDir(item.Project, item.Agent), item.ID)); err != nil {
+		return fmt.Errorf("%w: %s is deleted, but not all of its files: %w", ErrMediaFilesLeft, item.ID, err)
+	}
+	return nil
 }
+
+// ErrMediaFilesLeft is DeleteMedia having deleted the item but not all of its
+// files: it is gone from Media, and what is left on disk is said.
+var ErrMediaFilesLeft = errors.New("files left behind")
 
 // deleteAgentMedia deletes an agent's media as it goes, but for its
 // favorites: those are kept as if the agent's media were, their retention
@@ -756,7 +821,7 @@ func (m *Manager) deleteAgentMedia(ctx context.Context, a state.Agent) error {
 		removeAllBut(filepath.Join(old, a.Project, a.Name), kept)
 	}
 	if len(kept) == 0 {
-		return os.RemoveAll(m.MediaDir(a.Project, a.Name))
+		return removeTree(m.MediaDir(a.Project, a.Name))
 	}
 	removeAllBut(m.MediaDir(a.Project, a.Name), kept)
 	return m.keepAgentMedia(ctx, a)
@@ -766,7 +831,7 @@ func (m *Manager) deleteAgentMedia(ctx context.Context, a state.Agent) error {
 // kept items' own directories, each named for its item's ID.
 func removeAllBut(dir string, kept []state.Media) {
 	if len(kept) == 0 {
-		_ = os.RemoveAll(dir)
+		_ = removeTree(dir)
 		return
 	}
 	keep := make(map[string]bool, len(kept))
@@ -776,7 +841,7 @@ func removeAllBut(dir string, kept []state.Media) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		if !keep[e.Name()] {
-			_ = os.RemoveAll(filepath.Join(dir, e.Name()))
+			_ = removeTree(filepath.Join(dir, e.Name()))
 		}
 	}
 }

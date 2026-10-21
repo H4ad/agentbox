@@ -188,6 +188,36 @@ func TestDeleteMediaRemovesTheRowAndItsFile(t *testing.T) {
 	}
 }
 
+// A directory pulled out of an agent keeps its modes, and one without write
+// permission (a read-only report, a module cache) made os.RemoveAll fail with
+// "permission denied": the item's files have to go all the same.
+func TestDeleteMediaRemovesReadOnlyDirectories(t *testing.T) {
+	f := setup(t, fakeIncus(t, "exit 0"))
+	a := destroyFixture(t, f)
+	item := addMediaFixture(t, f, a)
+	dir := filepath.Join(f.m.MediaDir(item.Project, item.Agent), item.ID)
+	sub := filepath.Join(dir, "report", "assets")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "app.js"), []byte("x"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{sub, filepath.Dir(sub)} {
+		if err := os.Chmod(d, 0o555); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Dir(sub), 0o755); _ = os.Chmod(sub, 0o755) })
+
+	if err := f.m.DeleteMedia(context.Background(), item); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("DeleteMedia() left the read-only directory behind: %v", err)
+	}
+}
+
 // TestExportMediaWritesAReadmeAndCopiesEachItem checks that a note ends up in
 // the README as text, that a file item is copied out beside it, and that an
 // agent with nothing to export is refused.
@@ -325,5 +355,62 @@ func TestScreenshotRefusesAnExplicitBrowserTargetOnABlankPage(t *testing.T) {
 	_, err := f.m.Screenshot(context.Background(), a, agent.ScreenshotOptions{Target: "browser", Name: "app"})
 	if err == nil || !strings.Contains(err.Error(), "--target display") {
 		t.Errorf("err = %v, want one pointing to --target display", err)
+	}
+}
+
+// A staged recording that isn't in the stage on the host (the stage wasn't
+// mounted when the agent started: it isn't required) was written to the
+// agent's own disk: it is copied out from there instead of being lost.
+func TestStopRecordingTakesAnUnstagedRecordingFromTheAgent(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "recording.mp4")
+	if err := os.WriteFile(src, []byte("frames"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls := filepath.Join(t.TempDir(), "calls")
+	t.Setenv("SRC", src)
+	t.Setenv("CALLS", calls)
+	f := setup(t, fakeIncus(t, `echo "$*" >>"$CALLS"
+case "$1" in
+  list) echo '[{"name":"ab-hello-stack-agent-01","status":"Running"}]' ;;
+  exec) echo '{"name":"flow","target":"display","staged":true}' ;;
+  file) [ "$2" = "pull" ] && cp "$SRC" "$4" ;;
+esac`))
+	a := logsFixture(t, f, "none")
+
+	item, err := f.m.StopRecording(context.Background(), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(f.m.MediaPath(item)); err != nil || string(content) != "frames" {
+		t.Errorf("the recording kept = %q, %v", content, err)
+	}
+	log, _ := os.ReadFile(calls)
+	if !strings.Contains(string(log), "/.local/state/agentbox/out/recording.mp4") {
+		t.Errorf("not pulled from the agent's out directory:\n%s", log)
+	}
+}
+
+// A recording that can't be taken stays in the agent, and the error says
+// where: the agent's copy isn't cleaned up, as it was before.
+func TestStopRecordingThatCantBeTakenSaysWhereItIs(t *testing.T) {
+	calls := filepath.Join(t.TempDir(), "calls")
+	t.Setenv("CALLS", calls)
+	f := setup(t, fakeIncus(t, `echo "$*" >>"$CALLS"
+case "$1" in
+  list) echo '[{"name":"ab-hello-stack-agent-01","status":"Running"}]' ;;
+  exec) echo '{"name":"flow","target":"display"}' ;;
+  file) echo "Error: not found" >&2; exit 1 ;;
+esac`))
+	a := logsFixture(t, f, "none")
+
+	_, err := f.m.StopRecording(context.Background(), a)
+	if err == nil || !strings.Contains(err.Error(), "keeping the recording") || !strings.Contains(err.Error(), "it is still in the agent, at /home/") {
+		t.Errorf("StopRecording() = %v", err)
+	}
+	if log, _ := os.ReadFile(calls); strings.Contains(string(log), "rm -f /home/dev/.local/state/agentbox/recording.*") {
+		t.Errorf("the agent's copy was removed:\n%s", log)
+	}
+	if items, _ := f.st.Media(context.Background(), a.Project, a.Name); len(items) != 0 {
+		t.Errorf("an item was saved: %+v", items)
 	}
 }
