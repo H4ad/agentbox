@@ -559,6 +559,8 @@ export function seedV2(queryClient: QueryClient, pins: string | null): void {
     const extraName = own && extra.some(([n]) => n === decodeURIComponent(own[1])) ? decodeURIComponent(own[1]) : null;
     if (method === 'GET' && extraName && own![2] === 'lead') return json(queryClient.getQueryData(['projectChat', extraName]) ?? { project: extraName, ref: `${extraName}/lead`, started: true, chat: 'ready' });
     if (method === 'GET' && extraName && own![2] === 'chat/runners') return json({ tool: 'claude', runners: [{ tool: 'claude', name: 'Claude Code', ready: true, installed: true }] });
+    // An empty chat, not a list: [] has no items, which the chat read as a failure.
+    if (method === 'GET' && extraName && own![2] === 'chat') return json({ agent: `${extraName}/lead`, seq: 0, session: { state: 'ready', tool: 'claude' }, items: [] });
     if (method === 'GET' && extraName && own![2] !== 'icon') return json([]);
     if (method === 'GET' && path.startsWith('/v1/skills')) return json([]);
     if (method === 'GET' && path === '/v1/project-activity') return json(projects.map((p) => ({ project: p.name, lastActivity: ago(lastSaid[p.name] ?? 10 * day), lastMessage: ago(lastSaid[p.name] ?? 10 * day) })));
