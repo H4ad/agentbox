@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle, Square, TriangleAlert, Unplug } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { View } from '../App';
 import type { VMPower } from '../../preload';
@@ -8,6 +8,7 @@ import type * as T from '../../shared/api';
 import { api } from '../lib/api';
 import { useConnection } from '../lib/events';
 import { formatNumber, useT } from '../lib/i18n';
+import { holdsMachine } from '../lib/machines';
 import { machineStatus, memoryFull, type MachineStatus as Status } from '../lib/machineStatus';
 import { setTopBarDetailed, useTopBarDetailed } from '../lib/topBarLayout';
 import { cn, humanBytes } from '../lib/utils';
@@ -36,7 +37,7 @@ export function MachineStatus({ agents, onSelect }: { agents: T.Agent[]; onSelec
         <Strip free={free} status={status} host={host} vmDisk={vmDisk} onSelect={onSelect} />
       ) : (
         <>
-          <Bubble free={free} status={status} host={host} vmDisk={vmDisk} agents={agents} />
+          <Bubble free={free} status={status} host={host} vmDisk={vmDisk} agents={agents} onSelect={onSelect} />
           {(freeing(free) || free.mode === 'start' || (free.mode === 'free' && status.kind === 'memory')) && <FreeButton free={free} style="freeMemory" />}
         </>
       )}
@@ -107,18 +108,22 @@ function Bubble({
   host,
   vmDisk,
   agents,
+  onSelect,
 }: {
   free: FreeResources;
   status: Status;
   host?: T.HostUsage;
   vmDisk?: T.VMDisk;
   agents: T.Agent[];
+  onSelect: (view: View) => void;
 }) {
   const t = useT();
   const connection = useConnection();
   const sentence = useSentence(free, status);
+  const [open, setOpen] = useState(false);
+  const machines = agents.filter(holdsMachine).length;
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -189,6 +194,20 @@ function Bubble({
           {free.vm?.error && <Notice className="text-[12px]">{free.vm.error}</Notice>}
           {status.kind === 'memory' && <span className="text-[11.5px] leading-relaxed text-muted">{t('shell.machine.memoryHint')}</span>}
           <VMActions free={free} style="freeMemory" />
+          {/* Every machine that's up, finished agents' too, each with a Stop. */}
+          {machines > 0 && (
+            <button
+              type="button"
+              className="justify-self-start text-[11.5px] text-brand-400 transition hover:underline"
+              onClick={() => {
+                setOpen(false);
+                onSelect({ kind: 'machines' });
+              }}
+              data-machine-machines={machines}
+            >
+              {t('machines.seeAll', { count: machines })}
+            </button>
+          )}
           <button
             type="button"
             className="justify-self-start text-[11.5px] text-brand-400 transition hover:underline"

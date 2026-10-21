@@ -5,6 +5,7 @@
 import { plainText } from './plainText.ts';
 import type * as T from '../../shared/api';
 import { chatLabel } from './agentStatus.ts';
+import { holdsMachine } from './machines.ts';
 
 // AgentSt is where an agent stands in the sidebar: it asks you something
 // (a question, a credential, a permission), stopped on an error, is ready
@@ -143,13 +144,16 @@ export const leadBusy = (chat: string | undefined) => chat === 'running';
 
 // activeProjects is the projects with something going on, which the sidebar
 // lists above the Idle list: a lead mid-turn or waiting on the user's
-// permission, a live agent (at work, asking, failed or to review), or a
+// permission, a live agent (at work, asking, failed or to review), an agent
+// whose machine is up, or a
 // question to the user from an agent that still exists (asks, by ref): one
 // from a destroyed agent can never be answered.
 export function activeProjects(rows: readonly Row[], leads: ReadonlyMap<string, string | undefined>, asks: Iterable<string>): Set<string> {
   const out = new Set<string>();
   for (const [project, chat] of leads) if (leadBusy(chat) || chat === 'waiting') out.add(project);
-  for (const r of rows) if (live(r.st)) out.add(r.agent.project);
+  // A finished agent whose machine is still up is something going on: it holds
+  // the VM's memory, and in Idle its project read "nothing running".
+  for (const r of rows) if (live(r.st) || holdsMachine(r.agent)) out.add(r.agent.project);
   const refs = new Set(rows.map((r) => `${r.agent.project}/${r.agent.name}`));
   for (const ref of asks) if (refs.has(ref)) out.add(ref.split('/')[0]);
   return out;

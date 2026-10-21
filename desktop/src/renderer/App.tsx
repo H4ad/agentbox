@@ -24,6 +24,7 @@ import { markSeen as markNoticesSeen, noticeText, noticeView } from "./lib/notif
 import { projectLabel } from "./lib/projectName";
 import type * as T from "../shared/api";
 import { JobsView } from "./components/JobsView";
+import { MachinesView } from "./components/MachinesView";
 import { NewAgentDialog } from "./components/NewAgentDialog";
 import { ProjectView } from "./components/ProjectView";
 import { PastAgents } from "./components/PastAgents";
@@ -75,6 +76,8 @@ export type View =
   | { kind: "home" }
   | { kind: "homeChat" }
   | { kind: "jobs" }
+  // Every agent whose machine is up, across projects (components/MachinesView).
+  | { kind: "machines" }
   | { kind: "media" }
   | { kind: "settings" }
   | { kind: "project"; project: string; tab?: ProjectPlaceName }
@@ -637,6 +640,7 @@ export function App({ initial }: { initial?: View } = {}) {
                   />
                 )}
                 {view.kind === "jobs" && <JobsView />}
+                {view.kind === "machines" && <MachinesView onSelect={select} />}
                 {view.kind === "group" && <CompareView id={view.id} onSelect={select} />}
                 {view.kind === "media" && <AllMediaView onSelect={select} />}
                 {view.kind === "today" && <TodayView project={view.project} onSelect={select} />}

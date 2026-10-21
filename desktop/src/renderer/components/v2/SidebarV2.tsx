@@ -17,7 +17,7 @@
 // lib/leadFirst.ts's, lib/projectOrder.ts's and lib/sidebarHidden.ts's.
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Archive, Check, ChevronRight, CircleArrowUp, Eye, EyeOff, FolderPlus, House, Images, ListChecks, ListFilter, LoaderCircle, MoonStar, RefreshCw, Search, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
+import { Archive, Check, ChevronRight, CircleArrowUp, Eye, EyeOff, FolderPlus, House, Images, ListChecks, ListFilter, LoaderCircle, MoonStar, RefreshCw, Search, Server, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import * as A from '../../../shared/api';
 import type * as T from '../../../shared/api';
@@ -27,6 +27,7 @@ import { useT, type MessageKey } from '../../lib/i18n';
 import { pageItems, useQuestions, useReviewHead } from '../../lib/inboxPages';
 import { activeProjects, agentSt, countSt, filterCount, leadLine, leadBusy, liveOrder, projectRows, toggle, type AgentSt, type Filters, type ProjectRows, type Row } from '../../lib/leadFirst';
 import { useGroupIdle } from '../../lib/groupIdle';
+import { holdsMachine } from '../../lib/machines';
 import { movePin, orderProjects, togglePin } from '../../lib/projectOrder';
 import { HelpMenu } from './Tour';
 import { setFilterChoice, setHiddenOpen, setPins, useV2Projects } from '../../lib/v2Projects';
@@ -107,6 +108,19 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
     };
     return (agents.data ?? []).map((agent) => ({ agent, st: agentSt(agent, ctx), pr: prs.get(agent.ref) }));
   }, [agents.data, head.data, questions.data, reviewing, prs]);
+  // The finished agents still holding a machine, by project: not in its
+  // counts as live, but on its row, since they hold the VM's memory; and all
+  // the machines up, for the foot's Running machines.
+  const machineKey = rows.flatMap((r) => (holdsMachine(r.agent) ? [`${r.agent.project}\t${r.st === 'done' ? 1 : 0}`] : [])).join('\n');
+  const { idleMachines, machines } = useMemo(() => {
+    const idle = new Map<string, number>();
+    const lines = machineKey ? machineKey.split('\n') : [];
+    for (const l of lines) {
+      const [project, done] = l.split('\t');
+      if (done === '1') idle.set(project, (idle.get(project) ?? 0) + 1);
+    }
+    return { idleMachines: idle, machines: lines.length };
+  }, [machineKey]);
   const label = (p: T.Project) => projectLabel(p);
   const currentAgentProject = view.kind === 'agent' ? view.ref.split('/')[0] : undefined;
 
@@ -202,6 +216,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       project={p.project}
       all={p.all}
       approvals={p.approvals}
+      idleMachines={idleMachines.get(p.project.name) ?? 0}
       pinned={pinned.has(p.project.name)}
       hidden={hiddenSet.has(p.project.name)}
       view={view}
@@ -344,14 +359,15 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       </nav>
 
       {/* The foot is one row of icons, each named by its tooltip: Settings,
-          which opens straight away, Past agents, Media and Jobs, the places
-          across every project, the one open highlighted, and the update check.
+          which opens straight away, Running machines with how many are up,
+          Past agents, Media and Jobs, the places across every project, the one open highlighted, and the update check.
           Home, the chat and its Status tab, heads the list above; which
           AgentBox this window drives is under Settings → General. */}
       <div className="flex items-center gap-1 border-t border-line p-2" data-v2-foot>
         {(
           [
             { kind: 'settings', icon: Settings, label: t('common.settings'), alert: setup.data && !setup.data.ready },
+            { kind: 'machines', icon: Server, label: t('machines.footTip', { count: machines }), alert: false },
             { kind: 'pastAgents', icon: Archive, label: t('pastAgents.title'), alert: false },
             { kind: 'media', icon: Images, label: t('shell.nav.media'), alert: false },
             { kind: 'jobs', icon: ListChecks, label: t('shell.nav.jobs'), alert: false },
@@ -373,6 +389,11 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
               >
                 <Icon className={cn('size-4', active ? 'text-brand-300' : 'text-subtle')} />
                 {alert && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-amber-400" title={t('shell.sidebar.needsAttention')} aria-label={t('shell.sidebar.needsAttention').toLowerCase()} />}
+                {kind === 'machines' && machines > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 min-w-3.5 rounded-full bg-surface-strong px-1 text-center text-[9.5px] font-semibold leading-3.5 tabular-nums text-secondary ring-1 ring-line-strong" data-v2-machines={machines}>
+                    {machines}
+                  </span>
+                )}
               </button>
             </Tip>
           );
@@ -613,6 +634,7 @@ function ProjectLead({
   project,
   all,
   approvals,
+  idleMachines,
   pinned,
   hidden,
   view,
@@ -625,6 +647,8 @@ function ProjectLead({
   project: T.Project;
   all: Row[];
   approvals: number;
+  // Its finished agents whose machines are still up.
+  idleMachines: number;
   pinned: boolean;
   hidden: boolean;
   view: View;
@@ -650,7 +674,7 @@ function ProjectLead({
   const counts = countSt(all.map((r) => r.st));
   // The lead at work counts as one working.
   if (leadBusy(chat.data?.chat)) counts.working++;
-  const counted = counts.working + counts.review + counts.needs + counts.error > 0;
+  const counted = counts.working + counts.review + counts.needs + counts.error + idleMachines > 0;
   const name = projectLabel(project);
   const active = (view.kind === 'project' && view.project === project.name) || (view.kind === 'agent' && view.ref.startsWith(`${project.name}/`));
   const open_ = () => onSelect({ kind: 'project', project: project.name });
@@ -768,6 +792,14 @@ function ProjectLead({
                         {t(key, { count: counts[st] })}
                       </span>
                     ) : null,
+                  )}
+                  {idleMachines > 0 && (
+                    <Tip label={t('v2.count.idleMachinesTip')}>
+                      <span className="inline-flex items-center gap-1 text-subtle" data-v2-count="machines">
+                        <Server className="size-2.5 shrink-0" />
+                        {t('v2.count.idleMachines', { count: idleMachines })}
+                      </span>
+                    </Tip>
                   )}
                 </span>
               )}

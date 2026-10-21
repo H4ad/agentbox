@@ -63,6 +63,9 @@ export function TopBar({
     case 'jobs':
       crumbs.push({ label: t('shell.nav.jobs') });
       break;
+    case 'machines':
+      crumbs.push({ label: t('machines.title') });
+      break;
     case 'media':
       crumbs.push({ label: t('shell.nav.media') });
       break;

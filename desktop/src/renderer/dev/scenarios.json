@@ -2096,5 +2096,26 @@
       "header [data-inbox]",
       "[data-review-row]"
     ]
+  },
+  {
+    "id": "machines-sidebar-dark",
+    "description": "UI v2 with idle projects grouped: courier's two finished agents still hold running machines, so it stays out of Idle with \"2 idle machines\", and the foot counts every machine up — dark",
+    "query": "app=project&v2=1&group=1&machines=1&theme=dark",
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "id": "machines-view-dark",
+    "description": "Running machines: every agent whose machine is up, by project, heaviest first, with CPU, RAM and Stop — dark",
+    "query": "app=machines&v2=1&machines=1&theme=dark",
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "id": "machines-view-light",
+    "description": "Same as machines-view-dark, light appearance",
+    "query": "app=machines&v2=1&machines=1&theme=light",
+    "width": 1440,
+    "height": 900
   }
 ]

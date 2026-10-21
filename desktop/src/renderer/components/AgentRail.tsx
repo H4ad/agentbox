@@ -8,6 +8,7 @@ import { countByAgent, livePages } from '../lib/pages';
 import { useT } from '../lib/i18n';
 import { useProjectName } from '../lib/useProjectName';
 import { avatarMood, chatLabel, isAsking, rank, settled, statusTip, type Mood } from '../lib/agentStatus';
+import { holdsMachine } from '../lib/machines';
 import { cn, timeAgo } from '../lib/utils';
 import { AgentContextMenu } from './AgentContextMenu';
 import { AgentInfoCard } from './AgentInfoCard';
@@ -259,9 +260,12 @@ export function useRailAgents(project: string | null) {
   for (const ev of events.data ?? []) if (ev.summary && !lastSummary.has(ev.ref)) lastSummary.set(ev.ref, ev.summary);
   const mine = (agents.data ?? []).filter((a) => a.project === project).toSorted((a, b) => rank(a) - rank(b));
   const asking = (agent: T.Agent) => isAsking(questions.data, agent.ref);
-  // An agent with a question waiting on you stays on top, whatever its chat is doing.
-  const moving = mine.filter((a) => !settled(a) || asking(a));
-  const finished = mine.filter((a) => settled(a) && !asking(a));
+  // An agent with a question waiting on you stays on top, whatever its chat is
+  // doing, and so does a finished one whose machine is still up: folded away,
+  // it held its memory out of sight (lib/machines.ts).
+  const folded = (a: T.Agent) => settled(a) && !asking(a) && !holdsMachine(a);
+  const moving = mine.filter((a) => !folded(a));
+  const finished = mine.filter(folded);
   const prs = new Map((fleet.data?.agents ?? []).map((a) => [a.ref, a.pr]));
   const fleetOf = new Map((fleet.data?.agents ?? []).map((a) => [a.ref, a]));
   const mood = (agent: T.Agent) => avatarMood(agent, asking(agent));

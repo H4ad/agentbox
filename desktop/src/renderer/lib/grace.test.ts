@@ -42,6 +42,7 @@ test('a busy project going through its gaps never reads idle under the grace', (
     raw.push(now.has('p'));
     assert.equal(hold(seen, now, s.at).held.has('p'), true, `idle at ${s.at}ms`);
   }
-  // Without it, it dropped out at the lead's turn gap and as the agent finished.
-  assert.deepEqual(raw, [true, false, true, true, true, false, true]);
+  // Without it, it drops out at the lead's turn gap. It no longer does as the
+  // agent finishes: its machine is still up, which counts (lib/machines.ts).
+  assert.deepEqual(raw, [true, false, true, true, true, true, true]);
 });

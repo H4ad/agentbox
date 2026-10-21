@@ -164,7 +164,7 @@
 //                           dev bridge (fixtures.ts)
 //   ?power=wsl-running|wsl-off
 //                           the same on Windows, for AgentBox's WSL distro
-//   ?app=home|project|pulls|agent-99|settings
+//   ?app=home|project|pulls|agent-99|settings|machines
 //                           the whole App, sidebar, top bar, page and rail, as
 //                           the window shows it, open on Home, the project's
 //                           chat, agent-99 or Settings: for narrow and portrait
@@ -175,6 +175,9 @@
 //   &stale=1                with &v2=1 and &idle=1, idle-1 has unseen questions from destroyed agents
 //   &hidden=a,b             with &v2=1, those projects hidden from the sidebar
 //   &idle=12                with &v2=1, that many more projects with nothing going on, for Idle
+//   &group=1                with &v2=1, idle projects grouped into Idle (lib/groupIdle.ts)
+//   &machines=1             with &v2=1, finished agents in courier and agentbox still
+//                           holding running machines, with their CPU and RAM
 //   &signedout=1            Claude Code with no login: the composer's banner, and Send's tooltip
 //   &v2=1                   with ?app=, UI v2, the lead-first layout (Settings → General
 //                           → Layout): leads with their last lines
@@ -272,7 +275,7 @@ import { leadAgentFrom } from '../components/ProjectChatPanel';
 import { api } from '../lib/api';
 import type { AgentPlaceName, ProjectPlaceName } from '../lib/tabs';
 import { Markdown } from '../components/chat/Markdown';
-import { agent12Chat, asleepChat, buildFixtures, claudeLimits, dropDevAgent, compactionThread, richChat, richStreamText, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedSignedOut, seedNightly, seedMeterUsage, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, setNotifications } from './fixtures';
+import { agent12Chat, asleepChat, buildFixtures, claudeLimits, dropDevAgent, compactionThread, richChat, richStreamText, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedSignedOut, seedNightly, seedMeterUsage, seedRunningMachines, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, setNotifications } from './fixtures';
 import { publishOne, seedPages } from './pages';
 import { seedPastAgents } from './pastAgents';
 import { openPanelOn, pickTarget, setPanel, setPanelOpen, setView, type PanelView } from '../lib/rightPanel';
@@ -289,6 +292,7 @@ import { PipFinish, seedPip } from './pip';
 import { seedPick } from './pick';
 import { seedTimelines } from './timeline';
 import { setUiV2 } from '../lib/uiV2';
+import { setGroupIdle } from '../lib/groupIdle';
 import { setTourState, tours, welcomeTour } from '../lib/tours';
 
 installDevBridge();
@@ -483,6 +487,10 @@ setUiV2(params.get('v2') === '1');
 if (appView && params.get('v2') === '1') {
   seedLeadLines(queryClient);
   seedV2(queryClient, params.get('pins'));
+  // &group=1: Settings' "Group idle projects and sort by activity" on.
+  setGroupIdle(params.get('group') === '1');
+  // &machines=1: finished agents still holding running machines (fixtures.ts).
+  if (params.get('machines') === '1') seedRunningMachines(queryClient);
   seedEvidence(queryClient);
   // &stale=1: idle-1 has unseen questions from agents that no longer exist.
   if (params.get('stale') === '1') {
@@ -1335,6 +1343,7 @@ if (phoneMode === 'frame') {
     appView === 'home' ? { kind: 'home' }
     : appView === 'today' ? { kind: 'today', project: PROJECT }
     : appView === 'settings' ? { kind: 'settings' }
+    : appView === 'machines' ? { kind: 'machines' }
     : appView === 'homeChat' ? { kind: 'homeChat' }
     : appView === 'project' || appView === 'pulls' ? { kind: 'project', project: PROJECT, tab: appView === 'pulls' ? 'pulls' : 'chat' }
     : { kind: 'agent', ref: `${PROJECT}/${appView}` };

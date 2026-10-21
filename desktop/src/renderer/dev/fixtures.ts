@@ -1762,6 +1762,49 @@ export function seedMeterUsage(queryClient: QueryClient): void {
   queryClient.setQueryData(['cpuUsage'], cpuUsage);
 }
 
+// seedRunningMachines is &machines=1 (with ?app=…&v2=1): as on the user's VM
+// on 2026-10-21, finished agents that still hold running machines, two in
+// courier, whose lead is quiet, and agentbox's, with what each uses, read
+// the way the daemon answers it. Stop, on a row, stops that machine.
+export function seedRunningMachines(queryClient: QueryClient): void {
+  const GiB = 1024 ** 3;
+  const extra = [
+    agent({ ref: 'courier/agent-19', project: 'courier', title: 'Retry webhooks with backoff', chat: 'ready', outcome: 'done', createdAt: new Date(Date.now() - 5 * 3600_000).toISOString() }),
+    agent({ ref: 'courier/agent-20', project: 'courier', title: 'Address format for EU shipments', ai: 'codex', chat: 'ready', outcome: 'done', createdAt: new Date(Date.now() - 4 * 3600_000).toISOString() }),
+  ];
+  const agents = [...(devState.agents ?? []), ...extra];
+  const running = agents.filter((a) => a.state === 'running' || a.state === 'paused');
+  const cpu = (i: number) => [96, 41, 12, 3, 0.4, 7][i % 6];
+  const memory = (i: number) => [1.6, 1.1, 0.6, 0.5, 0.9, 0.3][i % 6] * GiB;
+  const memoryUsage: T.MemoryUsage = {
+    hostTotal: 17 * GiB,
+    agentsUsed: 14 * GiB,
+    otherUsed: 1.4 * GiB,
+    swapTotal: 0,
+    swapUsed: 0,
+    agentsSwap: 0,
+    agents: running.map((a, i) => ({ ref: a.ref, title: a.title, state: a.state, memory: memory(i), swap: 0 })),
+  };
+  const cpuUsage: T.CPUUsage = { hostCPU: 88, hostCores: 8, otherCPU: 6, agents: running.map((a, i) => ({ ref: a.ref, title: a.title, state: a.state, cpu: a.state === 'paused' ? 0 : cpu(i) })) };
+  devState.agents = agents;
+  devState.memoryUsage = memoryUsage;
+  devState.cpuUsage = cpuUsage;
+  queryClient.setQueryData(['agents'], agents);
+  queryClient.setQueryData(['memoryUsage'], memoryUsage);
+  queryClient.setQueryData(['cpuUsage'], cpuUsage);
+  // Stopping one, as the daemon would: its machine stops, and it no longer
+  // counts in what the machines use.
+  devRequests.push((method, path) => {
+    const stop = method === 'POST' ? /^\/v1\/agents\/([^/]+)\/([^/]+)\/stop$/.exec(path) : null;
+    if (!stop) return undefined;
+    const ref = `${decodeURIComponent(stop[1])}/${decodeURIComponent(stop[2])}`;
+    devState.agents = (devState.agents ?? []).map((a) => (a.ref === ref ? { ...a, state: 'stopped', chat: 'off' } : a));
+    devState.memoryUsage = { ...memoryUsage, agents: (devState.memoryUsage?.agents ?? []).filter((a) => a.ref !== ref) };
+    devState.cpuUsage = { ...cpuUsage, agents: (devState.cpuUsage?.agents ?? []).filter((a) => a.ref !== ref) };
+    return { status: 200, body: JSON.stringify(devState.agents.find((a) => a.ref === ref)), contentType: 'application/json' };
+  });
+}
+
 // seedVMDisk is the top bar's disk meter in VM mode (?meters=disk), with the
 // numbers measured on the user's Cloud Hypervisor VM on 2026-10-01: pool.raw
 // is 100 GiB taking 18.4 GiB of the host's disk, with 15.5 GiB in use inside;

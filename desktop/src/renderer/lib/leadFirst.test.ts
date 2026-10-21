@@ -108,12 +108,21 @@ test('projectRows lists every project, live or not; a state filter narrows to ma
 test('activeProjects is a busy or asking lead, a live agent or a question; the rest are idle', () => {
   const rows: Row[] = [
     { agent: agent('a1', { project: 'p' }), st: 'review' },
-    { agent: agent('a2', { project: 'q' }), st: 'done' },
-    { agent: agent('agent-3', { project: 't' }), st: 'done' },
+    { agent: agent('a2', { project: 'q', state: 'stopped' }), st: 'done' },
+    { agent: agent('agent-3', { project: 't', state: 'stopped' }), st: 'done' },
   ];
   const leads = new Map([['p', 'ready'], ['q', 'ready'], ['r', 'running'], ['s', 'waiting'], ['t', 'ready'], ['u', undefined]]);
   // u's question is from an agent that was destroyed: nobody can answer it.
   assert.deepEqual([...activeProjects(rows, leads, ['t/agent-3', 'u/agent-28'])].sort(), ['p', 'r', 's', 't']);
+});
+
+test('a finished agent whose machine is still up keeps its project out of Idle', () => {
+  const rows: Row[] = [
+    { agent: agent('agent-19', { project: 'courier', outcome: 'done' }), st: 'done' },
+    { agent: agent('agent-2', { project: 'quill', state: 'paused' }), st: 'done' },
+    { agent: agent('agent-3', { project: 'blog', state: 'stopped' }), st: 'done' },
+  ];
+  assert.deepEqual([...activeProjects(rows, new Map(), [])].sort(), ['courier', 'quill']);
 });
 
 test('an agent the VM holds back for memory is still working, so its project stays up', () => {
