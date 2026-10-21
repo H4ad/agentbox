@@ -37,7 +37,8 @@
 //   ?gpu=none               Settings' GPU for agents with no GPU in the VM; =host
 //                           a Linux host's the VM gets at its next start,
 //                           =hostrestart turned on and waiting, =nvidia one it
-//                           can't have, =vm the no-GPU VM of before
+//                           can't have, =vm the no-GPU VM of before, =vz a
+//                           Mac's VM made without krunkit
 //   ?gpu=krunkit|running|restart|failed
 //                           a Mac's krunkit VM whose GPU turning it on readies,
 //                           being readied, waiting for a restart, or failed
@@ -50,6 +51,7 @@
 //   ?chat=stopped|paused    a stopped (or paused) agent's stored conversation,
 //                           readable, with Start (Resume) on the composer.
 //                           Start, or sending a message, wakes it after 1.5s
+//   ?app=agent-15&v2=1&review=1&sleep=stopped  a finished agent awaiting review whose machine sleeps: one bar
 //   ?chat=richstream        a rich block still arriving (a card); &done=1 the stream ended
 //                           unclosed (its code); &tall=1 a closed page taller than the frame
 //   ?chat=rich              a project chat's answer with each kind of rich block
@@ -174,8 +176,11 @@
 //   &pins=a,b               with &v2=1, those projects pinned, in that order
 //   &stale=1                with &v2=1 and &idle=1, idle-1 has unseen questions from destroyed agents
 //   &hidden=a,b             with &v2=1, those projects hidden from the sidebar
+//   &sections=1             with &v2=1, the user's sections (Classic's): Work, Side
+//                           projects and an empty Later, kept as the daemon would
+//   &groupidle=1            with &v2=1, "Group idle projects and sort by activity" on
+//                           (lib/groupIdle.ts; off otherwise)
 //   &idle=12                with &v2=1, that many more projects with nothing going on, for Idle
-//   &group=1                with &v2=1, idle projects grouped into Idle (lib/groupIdle.ts)
 //   &machines=1             with &v2=1, finished agents in courier and agentbox still
 //                           holding running machines, with their CPU and RAM
 //   &signedout=1            Claude Code with no login: the composer's banner, and Send's tooltip
@@ -432,6 +437,10 @@ if (params.get('gpu')) {
   queryClient.invalidateQueries = ((filters?: Parameters<typeof invalidate>[0]) => invalidate(filters ?? { queryKey: ['settings'] })) as typeof invalidate;
 }
 seedQueryClient(queryClient, fixtures);
+// The project chat's runner answers with the account it spends, "work" here.
+if (usage) {
+  queryClient.setQueryData<T.LeadRunners>(['chatRunners', PROJECT], { tool: 'claude', account: 'work', runners: [{ tool: 'claude', name: 'Claude Code', ready: true, installed: true }] });
+}
 if (defaults) seedDefaults(queryClient);
 // The project's chat can switch tool and account from its composer: Claude Code
 // on two accounts with their quota, Codex, and Cursor signed out.
@@ -450,6 +459,16 @@ if (chat === 'lead') {
 }
 // Before the first render, so the chat reads it rather than the dev bridge.
 if (chat === 'stopped' || chat === 'paused') queryClient.setQueryData(['chat', asleepRef], asleepChat(asleepRef));
+// &sleep=stopped|paused, with ?app=agent-15&v2=1&review=1: that agent has
+// finished awaiting review and its machine is asleep, so the review card and
+// the wake button share one bar.
+const sleep = params.get('sleep');
+if (sleep && appView?.startsWith('agent-')) {
+  const sleeper = fixtures.agents.find((a) => a.ref === `${PROJECT}/${appView}`);
+  if (sleeper) Object.assign(sleeper, { state: sleep === 'paused' ? 'paused' : 'stopped', interface: 'chat' });
+  queryClient.setQueryData(['agents'], fixtures.agents);
+  queryClient.setQueryData(['chat', `${PROJECT}/${appView}`], asleepChat(`${PROJECT}/${appView}`));
+}
 const artifacts = params.get('pages');
 if (artifacts) {
   seedPages(queryClient);
@@ -487,8 +506,7 @@ setUiV2(params.get('v2') === '1');
 if (appView && params.get('v2') === '1') {
   seedLeadLines(queryClient);
   seedV2(queryClient, params.get('pins'));
-  // &group=1: Settings' "Group idle projects and sort by activity" on.
-  setGroupIdle(params.get('group') === '1');
+  setGroupIdle(params.get('groupidle') === '1');
   // &machines=1: finished agents still holding running machines (fixtures.ts).
   if (params.get('machines') === '1') seedRunningMachines(queryClient);
   seedEvidence(queryClient);
@@ -686,7 +704,7 @@ if (usage || account) {
   const at = new Date(Date.now() - 12 * 60_000).toISOString();
   const resets = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
   queryClient.setQueryData(['claudeLimits'], [
-    { account: 'personal', default: true, at, status: 'allowed', windows: [
+    { account: 'default', default: true, at, status: 'allowed', windows: [
       { name: 'five_hour', label: '5-hour', utilization: 0.23, resetsAt: resets(3) },
       { name: 'seven_day', label: 'Weekly', utilization: 0.41, resetsAt: resets(80) },
     ] },
@@ -695,6 +713,18 @@ if (usage || account) {
       { name: 'seven_day', label: 'Weekly', utilization: 0.52, resetsAt: resets(40) },
     ] },
   ] satisfies T.ClaudeLimit[]);
+  // Codex: the default account (the pill says "Codex") and "atlan" (it says "atlan").
+  queryClient.setQueryData(['codexLimits'], [
+    { tool: 'codex', account: 'default', default: true, at, status: 'allowed', windows: [
+      { name: 'five_hour', label: '5-hour', utilization: 0.31, resetsAt: resets(2) },
+      { name: 'seven_day', label: 'Weekly', utilization: 0.18, resetsAt: resets(90) },
+    ] },
+    { tool: 'codex', account: 'atlan', default: false, at, status: 'allowed', windows: [
+      { name: 'five_hour', label: '5-hour', utilization: 0.54, resetsAt: resets(1.5) },
+      { name: 'seven_day', label: 'Weekly', utilization: 0.27, resetsAt: resets(60) },
+    ] },
+  ] satisfies T.ClaudeLimit[]);
+  queryClient.setQueryData<T.Agent[]>(['agents'], (as) => as?.map((a) => (a.ref === `${PROJECT}/agent-98` ? { ...a, codexAccount: 'atlan' } : a)));
 }
 
 if (account) {
@@ -712,6 +742,8 @@ function UsagePreview() {
     [`Project ${PROJECT}, on "work"`, { kind: 'project', project: PROJECT }],
     ['Claude agent-99, on "work"', { kind: 'agent', ref: `${PROJECT}/agent-99` }],
     ['Codex agent-96: nothing known, no meter', { kind: 'agent', ref: `${PROJECT}/agent-96` }],
+    ['Codex agent-98, on "atlan"', { kind: 'agent', ref: `${PROJECT}/agent-98` }],
+    ['Codex agent-37, on the default account', { kind: 'agent', ref: `${PROJECT}/agent-37` }],
   ];
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-ink)', font: '13px var(--font-sans)' }}>
