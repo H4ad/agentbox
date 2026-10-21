@@ -1,0 +1,322 @@
+### section guest
+os: Debian GNU/Linux 13 (trixie)
+kernel: 6.12.107+deb13-amd64
+mesa: 25.0.7-2+deb13u1
+cpus: 4
+devices:
+  00:02.0 VGA compatible controller [0300]: Device [1234:1111] (rev 02)
+  00:04.0 Display controller [0380]: Red Hat, Inc. Virtio 1.0 GPU [1af4:1050] (rev 01)
+  /dev/dri/by-path
+  /dev/dri/card0
+  /dev/dri/card1
+  /dev/dri/renderD128
+kernel log:
+  [   10.209383] [drm] Found bochs VGA, ID 0xb0c5.
+  [   10.209591] [drm] Framebuffer size 16384 kB @ 0xfd000000, mmio @ 0xfebd0000.
+  [   10.215207] [drm] Found EDID data blob.
+  [   10.224629] [drm] Initialized bochs-drm 1.0.0 for 0000:00:02.0 on minor 0
+  [   10.237519] [drm] pci: virtio-gpu-pci detected at 0000:00:04.0
+  [   10.237958] [drm] features: -virgl +edid -resource_blob -host_visible
+  [   10.237976] [drm] features: -context_init
+  [   10.253261] [drm] number of scanouts: 1
+  [   10.253417] [drm] number of cap sets: 0
+  [   10.293281] [drm] Initialized virtio_gpu 0.1.0 for 0000:00:04.0 on minor 1
+  [   10.348097] bochs-drm 0000:00:02.0: [drm] fb0: bochs-drmdrmfb frame buffer device
+  [   10.484543] virtio-pci 0000:00:04.0: [drm] fb1: virtio_gpudrmfb frame buffer device
+### end guest rc=0 seconds=0
+### section glxinfo-gpu
+name of display: :0
+display: :0  screen: 0
+direct rendering: Yes
+Extended renderer info (GLX_MESA_query_renderer):
+    Vendor: Mesa (0xffffffff)
+    Device: llvmpipe (LLVM 19.1.7, 256 bits) (0xffffffff)
+    Version: 25.0.7
+    Accelerated: no
+    Video memory: 1971MB
+    Unified memory: yes
+    Preferred profile: core (0x1)
+    Max core profile version: 4.5
+    Max compat profile version: 4.5
+    Max GLES1 profile version: 1.1
+    Max GLES[23] profile version: 3.2
+Memory info (GL_ATI_meminfo):
+    VBO free memory - total: 31 MB, largest block: 31 MB
+    VBO free aux. memory - total: 1568 MB, largest block: 1568 MB
+    Texture free memory - total: 31 MB, largest block: 31 MB
+    Texture free aux. memory - total: 1568 MB, largest block: 1568 MB
+    Renderbuffer free memory - total: 31 MB, largest block: 31 MB
+    Renderbuffer free aux. memory - total: 1568 MB, largest block: 1568 MB
+Memory info (GL_NVX_gpu_memory_info):
+    Dedicated video memory: 872693 MB
+    Total available memory: 874664 MB
+    Currently available dedicated video memory: 31 MB
+OpenGL vendor string: Mesa
+OpenGL renderer string: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version string: 4.50
+OpenGL core profile context flags: (none)
+OpenGL core profile profile mask: core profile
+
+OpenGL version string: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL shading language version string: 4.50
+OpenGL context flags: (none)
+OpenGL profile mask: compatibility profile
+
+OpenGL ES profile version string: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+
+### end glxinfo-gpu rc=0 seconds=2
+### section eglinfo-gpu
+libEGL warning: egl: failed to create dri2 screen
+libEGL warning: DRI2: failed to create screen
+libEGL warning: egl: failed to create dri2 screen
+libEGL warning: DRI2: failed to create screen
+Surfaceless platform:
+EGL API version: 1.5
+EGL vendor string: Mesa Project
+EGL version string: 1.5
+EGL client APIs: OpenGL OpenGL_ES 
+OpenGL core profile vendor: Mesa
+OpenGL core profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version: 4.50
+OpenGL compatibility profile vendor: Mesa
+OpenGL compatibility profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL compatibility profile version: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL compatibility profile shading language version: 4.50
+OpenGL ES profile vendor: Mesa
+OpenGL ES profile renderer: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL ES profile version: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version: OpenGL ES GLSL ES 3.20
+
+### end eglinfo-gpu rc=0 seconds=0
+### section vulkaninfo-gpu
+ERROR: [Loader Message] Code 0 : setup_loader_term_phys_devs:  Failed to detect any valid GPUs in the current config
+ERROR at ./vulkaninfo/./vulkaninfo.h:247:vkEnumeratePhysicalDevices failed with ERROR_INITIALIZATION_FAILED
+### end vulkaninfo-gpu rc=1 seconds=0
+### section glmark2-gpu
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+=======================================================
+    glmark2 2023.01
+=======================================================
+    OpenGL Information
+    GL_VENDOR:      Mesa
+    GL_RENDERER:    llvmpipe (LLVM 19.1.7, 256 bits)
+    GL_VERSION:     4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+    Surface Config: buf=32 r=8 g=8 b=8 a=8 depth=24 stencil=0 samples=0
+    Surface Size:   1280x720 windowed
+=======================================================
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[build] duration=3:use-vbo=true: FPS: 37 FrameTime: 27.179 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[texture] duration=3:texture-filter=linear: FPS: 52 FrameTime: 19.262 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[shading] duration=3:shading=phong: FPS: 15 FrameTime: 67.501 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[bump] bump-render=normals:duration=3: FPS: 48 FrameTime: 20.955 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[effect2d] duration=3: FPS: 17 FrameTime: 61.585 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[refract] duration=3: FPS: 2 FrameTime: 884.333 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[terrain] duration=3: FPS: 1 FrameTime: 5804.729 ms
+=======================================================
+                                  glmark2 Score: 23 
+=======================================================
+### end glmark2-gpu rc=0 seconds=31
+### section vkmark-gpu
+Error: vk::Instance::enumeratePhysicalDevices: ErrorInitializationFailed
+### end vkmark-gpu rc=1 seconds=0
+### section glxinfo-sw
+name of display: :0
+display: :0  screen: 0
+direct rendering: Yes
+Extended renderer info (GLX_MESA_query_renderer):
+    Vendor: Mesa (0xffffffff)
+    Device: llvmpipe (LLVM 19.1.7, 256 bits) (0xffffffff)
+    Version: 25.0.7
+    Accelerated: no
+    Video memory: 1971MB
+    Unified memory: yes
+    Preferred profile: core (0x1)
+    Max core profile version: 4.5
+    Max compat profile version: 4.5
+    Max GLES1 profile version: 1.1
+    Max GLES[23] profile version: 3.2
+Memory info (GL_ATI_meminfo):
+    VBO free memory - total: 31 MB, largest block: 31 MB
+    VBO free aux. memory - total: 1576 MB, largest block: 1576 MB
+    Texture free memory - total: 31 MB, largest block: 31 MB
+    Texture free aux. memory - total: 1576 MB, largest block: 1576 MB
+    Renderbuffer free memory - total: 31 MB, largest block: 31 MB
+    Renderbuffer free aux. memory - total: 1576 MB, largest block: 1576 MB
+Memory info (GL_NVX_gpu_memory_info):
+    Dedicated video memory: 130029 MB
+    Total available memory: 132000 MB
+    Currently available dedicated video memory: 31 MB
+OpenGL vendor string: Mesa
+OpenGL renderer string: llvmpipe (LLVM 19.1.7, 256 bits)
+OpenGL core profile version string: 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1
+OpenGL core profile shading language version string: 4.50
+OpenGL core profile context flags: (none)
+OpenGL core profile profile mask: core profile
+
+OpenGL version string: 4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+OpenGL shading language version string: 4.50
+OpenGL context flags: (none)
+OpenGL profile mask: compatibility profile
+
+OpenGL ES profile version string: OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1
+OpenGL ES profile shading language version string: OpenGL ES GLSL ES 3.20
+
+### end glxinfo-sw rc=0 seconds=1
+### section vulkaninfo-sw
+==========
+VULKANINFO
+==========
+
+Vulkan Instance Version: 1.4.309
+
+
+Instance Extensions: count = 18
+-------------------------------
+VK_EXT_debug_report                    : extension revision 10
+VK_EXT_debug_utils                     : extension revision 2
+VK_EXT_headless_surface                : extension revision 1
+VK_EXT_surface_maintenance1            : extension revision 1
+VK_EXT_swapchain_colorspace            : extension revision 5
+VK_KHR_device_group_creation           : extension revision 1
+VK_KHR_external_fence_capabilities     : extension revision 1
+VK_KHR_external_memory_capabilities    : extension revision 1
+VK_KHR_external_semaphore_capabilities : extension revision 1
+VK_KHR_get_physical_device_properties2 : extension revision 2
+VK_KHR_get_surface_capabilities2       : extension revision 1
+VK_KHR_portability_enumeration         : extension revision 1
+VK_KHR_surface                         : extension revision 25
+VK_KHR_surface_protected_capabilities  : extension revision 1
+VK_KHR_wayland_surface                 : extension revision 6
+VK_KHR_xcb_surface                     : extension revision 6
+VK_KHR_xlib_surface                    : extension revision 6
+VK_LUNARG_direct_driver_loading        : extension revision 1
+
+Instance Layers: count = 3
+--------------------------
+VK_LAYER_INTEL_nullhw       INTEL NULL HW                1.1.73   version 1
+VK_LAYER_MESA_device_select Linux device selection layer 1.4.303  version 1
+VK_LAYER_MESA_overlay       Mesa Overlay layer           1.4.303  version 1
+
+Devices:
+========
+GPU0:
+	apiVersion         = 1.4.305
+	driverVersion      = 0.0.1
+	vendorID           = 0x10005
+	deviceID           = 0x0000
+	deviceType         = PHYSICAL_DEVICE_TYPE_CPU
+	deviceName         = llvmpipe (LLVM 19.1.7, 256 bits)
+	driverID           = DRIVER_ID_MESA_LLVMPIPE
+	driverName         = llvmpipe
+	driverInfo         = Mesa 25.0.7-2+deb13u1 (LLVM 19.1.7)
+	conformanceVersion = 1.3.1.1
+	deviceUUID         = 6d657361-3235-2e30-2e37-2d322b646500
+	driverUUID         = 6c6c766d-7069-7065-5555-494400000000
+### end vulkaninfo-sw rc=0 seconds=0
+### section glmark2-sw
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+=======================================================
+    glmark2 2023.01
+=======================================================
+    OpenGL Information
+    GL_VENDOR:      Mesa
+    GL_RENDERER:    llvmpipe (LLVM 19.1.7, 256 bits)
+    GL_VERSION:     4.5 (Compatibility Profile) Mesa 25.0.7-2+deb13u1
+    Surface Config: buf=32 r=8 g=8 b=8 a=8 depth=24 stencil=0 samples=0
+    Surface Size:   1280x720 windowed
+=======================================================
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[build] duration=3:use-vbo=true: FPS: 50 FrameTime: 20.089 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[texture] duration=3:texture-filter=linear: FPS: 63 FrameTime: 15.907 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[shading] duration=3:shading=phong: FPS: 17 FrameTime: 62.035 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[bump] bump-render=normals:duration=3: FPS: 59 FrameTime: 17.058 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[effect2d] duration=3: FPS: 24 FrameTime: 42.818 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[refract] duration=3: FPS: 2 FrameTime: 902.376 ms
+** GLX does not support GLX_EXT_swap_control or GLX_MESA_swap_control!
+** Failed to set swap interval. Results may be bounded above by refresh rate.
+[terrain] duration=3: FPS: 1 FrameTime: 2404.106 ms
+=======================================================
+                                  glmark2 Score: 29 
+=======================================================
+### end glmark2-sw rc=0 seconds=28
+### section vkmark-sw
+=======================================================
+    vkmark 2025.01
+=======================================================
+    Vendor ID:      0x10005
+    Device ID:      0x0
+    Device Name:    llvmpipe (LLVM 19.1.7, 256 bits)
+    Driver Version: 1
+    Device UUID:    32352e302e372d322b64656231337531
+=======================================================
+[vertex] duration=3: FPS: 41 FrameTime: 24.390 ms
+[texture] duration=3: FPS: 9 FrameTime: 111.111 ms
+[shading] duration=3: FPS: 27 FrameTime: 37.037 ms
+[cube] duration=3: FPS: 131 FrameTime: 7.634 ms
+[effect2d] duration=3: FPS: 1 FrameTime: 1000.000 ms
+[desktop] duration=3: FPS: 3 FrameTime: 333.333 ms
+=======================================================
+                                   vkmark Score: 35
+=======================================================
+### end vkmark-sw rc=0 seconds=20
+### section dmesg-tail
+[    7.798182] systemd[1]: Queued start job for default target graphical.target.
+[    8.041588] systemd[1]: Starting modprobe@drm.service - Load Kernel Module drm...
+[    8.244635] ACPI: bus type drm_connector registered
+[    8.266595] systemd[1]: modprobe@drm.service: Deactivated successfully.
+[    8.267911] systemd[1]: Finished modprobe@drm.service - Load Kernel Module drm.
+[   10.201398] bochs-drm 0000:00:02.0: vgaarb: deactivate vga console
+[   10.209383] [drm] Found bochs VGA, ID 0xb0c5.
+[   10.209591] [drm] Framebuffer size 16384 kB @ 0xfd000000, mmio @ 0xfebd0000.
+[   10.215207] [drm] Found EDID data blob.
+[   10.224629] [drm] Initialized bochs-drm 1.0.0 for 0000:00:02.0 on minor 0
+[   10.237519] [drm] pci: virtio-gpu-pci detected at 0000:00:04.0
+[   10.237958] [drm] features: -virgl +edid -resource_blob -host_visible
+[   10.237976] [drm] features: -context_init
+[   10.253261] [drm] number of scanouts: 1
+[   10.253417] [drm] number of cap sets: 0
+[   10.278210] fbcon: bochs-drmdrmfb (fb0) is primary device
+[   10.293281] [drm] Initialized virtio_gpu 0.1.0 for 0000:00:04.0 on minor 1
+[   10.348097] bochs-drm 0000:00:02.0: [drm] fb0: bochs-drmdrmfb frame buffer device
+[   10.484543] virtio-pci 0000:00:04.0: [drm] fb1: virtio_gpudrmfb frame buffer device
+[   12.721196] I/O error, dev fd0, sector 0 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 2
+[   12.725835] floppy: error 10 while reading block 0
+[   12.932903] I/O error, dev fd0, sector 0 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 2
+[   12.934749] floppy: error 10 while reading block 0
+[   13.076907] I/O error, dev fd0, sector 0 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 2
+[   13.078796] floppy: error 10 while reading block 0
+[   13.216900] I/O error, dev fd0, sector 0 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 2
+[   13.219477] floppy: error 10 while reading block 0
+[   13.353021] I/O error, dev fd0, sector 0 op 0x0:(READ) flags 0x0 phys_seg 1 prio class 2
+[   13.355070] floppy: error 10 while reading block 0
+[   17.015254] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+### end dmesg-tail rc=0 seconds=0

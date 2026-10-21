@@ -1,0 +1,2 @@
+ERROR: [Loader Message] Code 0 : setup_loader_term_phys_devs:  Call to 'vkEnumeratePhysicalDevices' in ICD /usr/lib/x86_64-linux-gnu/libvulkan_virtio.so failed with error code -3
+ERROR at ./vulkaninfo/vulkaninfo.h:248:vkEnumeratePhysicalDevices failed with ERROR_INITIALIZATION_FAILED

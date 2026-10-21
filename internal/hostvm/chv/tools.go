@@ -1,7 +1,9 @@
 package chv
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -10,18 +12,22 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"time"
 )
 
 // A tool is one of the programs that run the VM, fetched into Layout.Bin. All
 // of them are static, so they run on any Linux distribution, and all are
 // checked against a SHA256 pinned here: nothing AgentBox runs the VM with can
-// change under it without a new AgentBox. None of them is ever published by
-// AgentBox; each is fetched from its own project, on the user's machine.
+// change under it without a new AgentBox. Each is fetched from its own
+// project, on the user's machine, but Cloud Hypervisor (chvBundle), which
+// AgentBox builds with patches and publishes itself.
 type tool struct {
 	name    string // its file in Layout.Bin
 	version string // for messages
@@ -45,15 +51,6 @@ type tool struct {
 // architectures fail with errArch: virtiofsd publishes no static build for
 // arm64, and Debian's image and the firmware would need pins of their own.
 var tools = []tool{
-	{
-		// We don't need ch-remote: the supervisor talks to Cloud
-		// Hypervisor's REST API over its socket itself.
-		name:    "cloud-hypervisor",
-		version: "v53.0",
-		url:     "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v53.0/cloud-hypervisor-static",
-		sha256:  "448af3d4e59b22c2987f7df94c213ad40fb53a10d437e42b5ee6c4fce7c29ecc",
-		exec:    true,
-	},
 	{
 		// Cloud Hypervisor's own build of EDK2. rust-hypervisor-firmware,
 		// the smaller alternative, can't boot Debian's image: its shim fails
@@ -89,12 +86,57 @@ var tools = []tool{
 	},
 }
 
+// A bundle is a tarball of tools AgentBox builds itself, published as a
+// release of its own repository (scripts/chv-gpu/build.sh, by the Cloud
+// Hypervisor workflow): pinned by the tarball's SHA256, and each file in it by
+// its own, which EnsureTools compares with what's installed, as for a tool.
+type bundle struct {
+	name    string // for messages
+	version string
+	url     string
+	sha256  string // the tarball's
+	files   []bundleFile
+}
+
+type bundleFile struct {
+	member string // its path in the tarball, under its top directory
+	name   string // its file in Layout.Bin, which may be in a directory
+	sha256 string
+	exec   bool
+}
+
+// chvBundle is Cloud Hypervisor, which every Linux VM runs, and the GPU
+// device that runs beside it when "GPU for agents" is on (gpu.go): v53.0 with
+// Spectrum OS's virtio-gpu patchset rebased onto it (scripts/chv-gpu/patches),
+// built static, which without --gpu runs as upstream's v53.0 does; crosvm's
+// GPU device and virglrenderer with Venus, which use the host's own graphics
+// libraries (Mesa, libdrm, libgbm, the Vulkan loader). crosvm finds
+// libvirglrenderer in ../lib and virgl_render_server is passed to it, so the
+// three keep the tarball's layout under gpuDir.
+var chvBundle = bundle{
+	name:    "cloud-hypervisor",
+	version: "v53.0 (AgentBox build 1)",
+	url:     "https://github.com/leciric/agentbox/releases/download/chv-53.0-agentbox1/chv-53.0-agentbox1-x86_64.tar.gz",
+	sha256:  "aaf764da396793402399a1666207f7125be085308c2a44c938dcf845db6ead38",
+	files: []bundleFile{
+		// We don't need ch-remote: the supervisor talks to Cloud
+		// Hypervisor's REST API over its socket itself.
+		{member: "bin/cloud-hypervisor", name: "cloud-hypervisor", sha256: "9f11eeba6777a91c780eb23cafd04bc88e0539c6d11c1b8edb090c5bf6a3a1e9", exec: true},
+		{member: "bin/crosvm", name: gpuDir + "/bin/crosvm", sha256: "0d227d20f60646892e05a9ac7d071b25c834236e14f070b68054fe344dd0d004", exec: true},
+		{member: "libexec/virgl_render_server", name: gpuDir + "/libexec/virgl_render_server", sha256: "cea12216a97d65f4f31d69b2586aa0c90fa33ecc97a5b96cf535924217673f3c", exec: true},
+		{member: "lib/libvirglrenderer.so.1.10.0", name: gpuDir + "/lib/libvirglrenderer.so.1", sha256: "d037c6f3eee2614b779118b6c9245dac441c73111bbff7486b1598088a6e178f"},
+	},
+}
+
+// gpuDir is where chvBundle's GPU device goes, under Layout.Bin.
+const gpuDir = "gpu"
+
 var errArch = fmt.Errorf("AgentBox's Cloud Hypervisor VM runs only on x86_64 (amd64) Linux for now, not %s", runtime.GOARCH)
 
 // EnsureTools fetches the programs that run the VM into l.Bin, when they
-// aren't there at the versions this build pins: cloud-hypervisor, its UEFI
-// firmware (CLOUDHV.fd), virtiofsd and passt, all static, all checked
-// against pinned SHA256 sums.
+// aren't there at the versions this build pins: cloud-hypervisor and the GPU
+// device (chvBundle), its UEFI firmware (CLOUDHV.fd), virtiofsd and passt,
+// all checked against pinned SHA256 sums.
 func EnsureTools(ctx context.Context, l Layout, log io.Writer) error {
 	if runtime.GOARCH != "amd64" {
 		return errArch
@@ -102,12 +144,145 @@ func EnsureTools(ctx context.Context, l Layout, log io.Writer) error {
 	if err := os.MkdirAll(filepath.Dir(l.Bin("x")), 0o755); err != nil {
 		return err
 	}
+	if err := ensureBundle(ctx, l, chvBundle, log); err != nil {
+		// A VM that ran before has a Cloud Hypervisor: it starts with that
+		// one rather than not at all, and without the GPU when the GPU
+		// device isn't there (gpu.go says so).
+		if _, statErr := os.Stat(l.Bin("cloud-hypervisor")); statErr != nil {
+			return err
+		}
+		imageLogf(log, "warning: %v; the VM runs the Cloud Hypervisor it has, and AgentBox tries again at its next start\n", err)
+	}
 	for _, t := range tools {
 		if err := ensureTool(ctx, l, t, log); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// ensureBundle installs b's files into l.Bin unless each is there with its
+// pinned sum: from the tarball, checked against its pin, each file checked
+// against its own and put in place with a rename, so a running VM's programs
+// are never written over.
+func ensureBundle(ctx context.Context, l Layout, b bundle, log io.Writer) error {
+	missing := false
+	for _, f := range b.files {
+		if sum, err := fileSum(l.Bin(f.name), sha256.New()); err != nil || sum != f.sha256 {
+			missing = true
+			break
+		}
+	}
+	if !missing {
+		return nil
+	}
+	imageLogf(log, "Fetching %s %s…\n", b.name, b.version)
+	start := time.Now()
+	tarball := l.Bin(b.name + ".tar.gz")
+	defer func() { _ = os.Remove(l.Bin(b.name + ".tar.gz")) }()
+	fail := func(err error) error { return fmt.Errorf("fetching %s %s: %w", b.name, b.version, err) }
+	if local := os.Getenv("AGENTBOX_CHV_TARBALL"); local != "" {
+		// A build not published yet, to try it (scripts/chv-gpu/check-vm.sh):
+		// it must still be the pinned one.
+		sum, err := fileSum(local, sha256.New())
+		if err != nil {
+			return fail(err)
+		}
+		if sum != b.sha256 {
+			return fail(fmt.Errorf("%s: %w (got %s, want %s)", local, errChecksum, sum, b.sha256))
+		}
+		tarball = local
+	} else if _, err := download(ctx, b.url, tarball, sha256.New(), b.sha256, log); err != nil {
+		return fail(err)
+	}
+	if err := untarFiles(tarball, b.files, l); err != nil {
+		return fail(err)
+	}
+	imageLogf(log, "Fetched %s in %s\n", b.name, time.Since(start).Round(100*time.Millisecond))
+	return nil
+}
+
+// untarFiles installs files from the .tar.gz at tarball, whose members are
+// under one top directory, into l.Bin: each into a .part first and checked,
+// and renamed only once all are, so a bad file installs none. Every file must
+// be in it.
+func untarFiles(tarball string, files []bundleFile, l Layout) error {
+	f, err := os.Open(tarball)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	want := map[string]bundleFile{}
+	for _, bf := range files {
+		want[bf.member] = bf
+	}
+	var parts []string
+	defer func() {
+		for _, p := range parts {
+			_ = os.Remove(p)
+		}
+	}()
+	tr := tar.NewReader(gz)
+	for len(want) > 0 {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		_, member, _ := strings.Cut(hdr.Name, "/")
+		bf, ok := want[member]
+		if !ok || hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		delete(want, member)
+		part := l.Bin(bf.name) + ".part"
+		parts = append(parts, part)
+		if err := writePart(tr, part, bf.sha256, bf.exec); err != nil {
+			return fmt.Errorf("%s: %w", member, err)
+		}
+	}
+	if len(want) > 0 {
+		return fmt.Errorf("%s has no %s", filepath.Base(tarball), strings.Join(slices.Sorted(maps.Keys(want)), ", "))
+	}
+	for _, p := range parts {
+		if err := os.Rename(p, strings.TrimSuffix(p, ".part")); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writePart writes r to part, if its SHA256 is want.
+func writePart(r io.Reader, part, want string, exec bool) error {
+	if err := os.MkdirAll(filepath.Dir(part), 0o755); err != nil {
+		return err
+	}
+	mode := os.FileMode(0o644)
+	if exec {
+		mode = 0o755
+	}
+	out, err := os.OpenFile(part, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	h := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(out, h), r); err != nil {
+		_ = out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); got != want {
+		return fmt.Errorf("%w (got %s, want %s)", errChecksum, got, want)
+	}
+	return os.Chmod(part, mode)
 }
 
 func ensureTool(ctx context.Context, l Layout, t tool, log io.Writer) error {

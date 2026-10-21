@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"agentbox/internal/hostos"
 	"agentbox/internal/paths"
 )
 
@@ -17,11 +18,11 @@ func fakeGPU(t *testing.T, dxg, render string, lib bool) {
 	t.Helper()
 	dir := t.TempDir()
 	missing := filepath.Join(dir, "missing")
-	old := []string{dxgPath, wslLib, wslDrivers, renderNodeGlob, VenusScript}
+	old := []string{dxgPath, wslLib, wslDrivers, renderNodeGlob, VenusScript, vmGPUStatusFile}
 	t.Cleanup(func() {
-		dxgPath, wslLib, wslDrivers, renderNodeGlob, VenusScript = old[0], old[1], old[2], old[3], old[4]
+		dxgPath, wslLib, wslDrivers, renderNodeGlob, VenusScript, vmGPUStatusFile = old[0], old[1], old[2], old[3], old[4], old[5]
 	})
-	dxgPath, renderNodeGlob, VenusScript = missing, missing, missing
+	dxgPath, renderNodeGlob, VenusScript, vmGPUStatusFile = missing, missing, missing, missing
 	if dxg != "" {
 		dxgPath = dxg
 	}
@@ -65,6 +66,43 @@ func TestFindVMGPU(t *testing.T) {
 	fakeGPU(t, file, file, true)
 	if got := FindVMGPU(); got.Kind != GPUNone || got.Reason == "" {
 		t.Errorf("no GPU: %+v", got)
+	}
+}
+
+// The Linux VM gets the host's GPU only as it starts: until it has a render
+// node, its supervisor's status says whether the switch can be turned on
+// (the host has a GPU) and why the VM has none.
+func TestFindVMGPUHost(t *testing.T) {
+	if hostos.WSL() {
+		t.Skip("WSL has its own reasons")
+	}
+	for _, tc := range []struct {
+		status string
+		kind   string
+		node   string
+		reason string
+	}{
+		{`{"state":"off","node":"/dev/dri/renderD129","gpu":"amdgpu, 1002:73df"}`, GPUHost, "/dev/dri/renderD129", ""},
+		{`{"want":true,"state":"restart","node":"/dev/dri/renderD128","reason":"the VM gets this GPU when it next starts: restart."}`, GPUHost, "/dev/dri/renderD128", "next starts"},
+		{`{"want":true,"state":"none","reason":"NVIDIA's proprietary driver can't share its memory."}`, GPUNone, "", "NVIDIA's proprietary driver can't share its memory"},
+		{`{"want":true,"state":"on","gpu":"amdgpu"}`, GPUNone, "", "no render node"},
+		{`not json`, GPUNone, "", "no GPU to give agents"},
+	} {
+		fakeGPU(t, "", "", false)
+		vmGPUStatusFile = filepath.Join(t.TempDir(), "status.json")
+		if err := os.WriteFile(vmGPUStatusFile, []byte(tc.status), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got := FindVMGPU()
+		if got.Kind != tc.kind || got.Node != tc.node || !strings.Contains(got.Reason, tc.reason) || strings.HasSuffix(got.Reason, ".") && tc.kind == GPUNone {
+			t.Errorf("%s: %+v", tc.status, got)
+		}
+	}
+
+	// The host's GPU isn't the VM's: agents get nothing from it.
+	m := &Manager{Paths: paths.Paths{Data: t.TempDir()}}
+	if steps := m.gpuSteps("i", VMGPU{Kind: GPUHost, Node: "/dev/dri/renderD128"}, map[string]map[string]string{vgpuDevice: {"type": "gpu", "gputype": "physical", "mode": "0666"}}); len(stepArgs(t, steps)) != 1 {
+		t.Errorf("steps for the host's GPU: %v", stepArgs(t, steps))
 	}
 }
 
@@ -192,5 +230,40 @@ GPU0:
 	none := parseGPUProbe("## devices\n## glx\nError: unable to open display :99\n## vulkan\n")
 	if none.Display || !strings.Contains(none.Error, "browser start") {
 		t.Errorf("no desktop: %+v", none)
+	}
+}
+
+// On the Linux VM, whose supervisor names the host GPU it gave the VM,
+// agents' Vulkan is pointed at that one (Venus lists every host GPU): a
+// profile written before the device that mounts it, named for the GPU.
+func TestGPUStepsLinuxVulkan(t *testing.T) {
+	if hostos.WSL() {
+		t.Skip("WSL")
+	}
+	fakeGPU(t, "", "/dev/nul*", false)
+	vmGPUStatusFile = filepath.Join(t.TempDir(), "status.json")
+	_ = os.WriteFile(vmGPUStatusFile, []byte(`{"want":true,"state":"on","vulkan":"1002:73df"}`), 0o644)
+	gpu := FindVMGPU()
+	if gpu.Kind != GPURender || gpu.Vulkan != "1002:73df" {
+		t.Fatalf("%+v", gpu)
+	}
+	m := &Manager{Paths: paths.Paths{Data: t.TempDir()}}
+	got := stepArgs(t, m.gpuSteps("i", gpu, map[string]map[string]string{}))
+	source := filepath.Join(m.Paths.Data, "gpu", "vulkan-1002-73df.sh")
+	want := [][]string{
+		{"config", "device", "add", "i", "agentbox-vgpu", "gpu", "gputype=physical", "mode=0666"},
+		{"config", "device", "add", "i", "agentbox-vgpu-profile", "disk", "source=" + source, "path=/etc/profile.d/agentbox-gpu.sh", "readonly=true"},
+	}
+	if !slices.EqualFunc(got, want, slices.Equal[[]string]) {
+		t.Errorf("got %q", got)
+	}
+	if b, _ := os.ReadFile(source); !strings.Contains(string(b), "export MESA_VK_DEVICE_SELECT=1002:73df\n") {
+		t.Errorf("profile: %q", b)
+	}
+
+	// A status that isn't ids (or none, as on a Mac) adds no profile.
+	_ = os.WriteFile(vmGPUStatusFile, []byte(`{"vulkan":"1002:73df; rm -rf /"}`), 0o644)
+	if gpu := FindVMGPU(); gpu.Vulkan != "" || len(gpu.devices("p")) != 1 {
+		t.Errorf("%+v", gpu)
 	}
 }

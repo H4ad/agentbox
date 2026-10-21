@@ -1911,7 +1911,9 @@ function UpdateChannel() {
 // Windows, a render node elsewhere. Off by default; shown off and unavailable,
 // with the daemon's reason, when the VM has none. A Mac's krunkit VM has one
 // to ready (vmGPU.setup), which turning it on starts: it says how far that
-// has got, asking again every few seconds while it runs.
+// has got, asking again every few seconds while it runs. On Linux the VM gets
+// the host's GPU only as it starts ("host"): the switch works, and the note
+// says the VM gets it at its next start.
 export function AgentGPU() {
   const t = useT();
   const settings = useQuery({
@@ -1964,6 +1966,11 @@ function vmGPUNote(t: ReturnType<typeof useT>, gpu: T.VMGPU): string {
   const setup = gpuSetupNotes[gpu.setup];
   if (setup) {
     return t(setup, { reason: gpu.reason });
+  }
+  if (gpu.kind === "host") {
+    return gpu.reason
+      ? t("settings.agentGPU.hostPending", { node: gpu.node, reason: gpu.reason })
+      : t("settings.agentGPU.host", { node: gpu.node });
   }
   return t(gpu.kind === "dxg" ? "settings.agentGPU.wsl" : "settings.agentGPU.renderNode", { node: gpu.node });
 }

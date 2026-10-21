@@ -51,6 +51,11 @@ type supervisor struct {
 	// pausedForDisk says the supervisor paused the VM because the host's
 	// disk was nearly full (diskbackstop.go).
 	pausedForDisk bool
+	// restartVM says the VM was ended to start it again (gpuLoop, when a
+	// kernel on trial doesn't come up), not to stop.
+	restartVM bool
+	// runScript, when set, runs what ssh would in the VM: for tests.
+	runScript func(ctx context.Context, script string) (string, error)
 }
 
 // Supervise is `agentbox vm run`: it runs the VM in the foreground (passt,
@@ -84,6 +89,15 @@ func Supervise(ctx context.Context, c Config, l Layout, p paths.Paths) error {
 }
 
 func (s *supervisor) logf(format string, args ...any) { s.log.Printf(format, args...) }
+
+// takeRestart reports whether the VM was ended to start it again, once.
+func (s *supervisor) takeRestart() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r := s.restartVM
+	s.restartVM = false
+	return r
+}
 
 func (s *supervisor) setState(state string) {
 	s.mu.Lock()
@@ -174,23 +188,41 @@ func (s *supervisor) run(ctx context.Context) error {
 	defer func() { stopLoops(); <-lanDone }()
 	go s.memoryLoop(loops)
 	go s.diskLoop(loops)
+	if m, ok := s.m.(*chMachine); ok {
+		go s.gpuLoop(loops, m)
+	}
 
 	var req api.VMStopRequest
-	select {
-	case <-s.m.done():
-		stopLoops()
-		closeForwards()
-		s.setState(api.VMStopping)
-		s.stopChildren()
-		if err := s.m.exitErr(); err != nil {
-			return fmt.Errorf("%v; its log: %s", err, s.l.Log())
+	for wait := true; wait; {
+		select {
+		case <-s.m.done():
+			if s.takeRestart() {
+				s.logf("starting the VM again")
+				s.stopChildren()
+				err := s.m.boot(ctx)
+				if err == nil {
+					if m, ok := s.m.(*chMachine); ok {
+						go s.gpuLoop(loops, m)
+					}
+					continue
+				}
+				s.logf("starting the VM again: %v", err)
+			}
+			stopLoops()
+			closeForwards()
+			s.setState(api.VMStopping)
+			s.stopChildren()
+			if err := s.m.exitErr(); err != nil {
+				return fmt.Errorf("%v; its log: %s", err, s.l.Log())
+			}
+			s.logf("the VM powered off")
+			return nil
+		case <-ctx.Done():
+			s.logf("stopping the VM: %v", context.Cause(ctx))
+		case req = <-s.stopc:
+			s.logf("stopping the VM, as asked (agents too: %t)", req.Agents)
 		}
-		s.logf("the VM powered off")
-		return nil
-	case <-ctx.Done():
-		s.logf("stopping the VM: %v", context.Cause(ctx))
-	case req = <-s.stopc:
-		s.logf("stopping the VM, as asked (agents too: %t)", req.Agents)
+		wait = false
 	}
 	stopLoops()
 	s.setState(api.VMStopping)
@@ -461,5 +493,13 @@ func (s *supervisor) sampleMemory(ctx context.Context) (memSample, error) {
 // ssh runs a shell command in the VM, through the ControlMaster every
 // command shares.
 func (s *supervisor) ssh(ctx context.Context, script string) (string, error) {
-	return runSSH(ctx, s.c, s.l, s.self, script)
+	return s.sshFor(ctx, script, sshTryTimeout)
+}
+
+// sshFor is ssh for a script that may take longer than a probe.
+func (s *supervisor) sshFor(ctx context.Context, script string, timeout time.Duration) (string, error) {
+	if s.runScript != nil {
+		return s.runScript(ctx, script)
+	}
+	return runSSHFor(ctx, s.c, s.l, s.self, script, timeout)
 }

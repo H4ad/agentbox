@@ -624,6 +624,8 @@ export const ptBR: Messages = {
   'settings.agentGPU.unavailable': 'Indisponível: {reason}',
   'settings.agentGPU.wsl': 'A GPU do WSL ({node}), pelo driver Direct3D 12 do Mesa.',
   'settings.agentGPU.renderNode': 'A GPU da VM ({node}).',
+  'settings.agentGPU.host': 'A GPU do seu computador ({node}): a VM do AgentBox a recebe na próxima vez que iniciar com isto ligado.',
+  'settings.agentGPU.hostPending': 'A GPU do seu computador ({node}): {reason}',
   'settings.agentGPU.setup.available': 'Ao ligar, a GPU da VM é preparada primeiro: o kernel genérico do Debian e um driver Vulkan compilado para o Mac, em alguns minutos. A VM usa o novo kernel quando você a reiniciar, e volta ao kernel antigo se o novo não iniciar.',
   'settings.agentGPU.setup.running': 'Preparando a GPU da VM: alguns minutos. Os agentes a recebem quando terminar.',
   'settings.agentGPU.setup.restart': 'A GPU da VM fica pronta quando a VM reiniciar no novo kernel: rode agentbox vm stop e depois agentbox vm start, quando for conveniente (os agentes param junto).',

@@ -1,0 +1,14 @@
+os: Debian GNU/Linux 13 (trixie)
+kernel: 6.12.48+deb13-amd64
+mesa: 25.0.7-2+deb13u1
+cpus: 4
+devices:
+  00:04.0 Display controller [0380]: Red Hat, Inc. Virtio 1.0 GPU [1af4:1050] (rev 01)
+  /dev/dri/card0
+  /dev/dri/renderD128
+kernel log:
+  [    2.913201] [drm] pci: virtio-gpu-pci detected at 0000:00:04.0
+  [    2.913789] [drm] features: +virgl +edid +resource_blob +host_visible +context_init
+  [    2.915112] [drm] number of scanouts: 1
+  [    2.915120] [drm] number of cap sets: 3
+  [    2.930411] [drm] Initialized virtio_gpu 0.1.0 for 0000:00:04.0 on minor 0

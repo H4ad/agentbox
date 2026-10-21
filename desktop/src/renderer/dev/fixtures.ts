@@ -21,6 +21,15 @@ function fixtureVMGPU(gpu: string | null): T.VMGPU {
   switch (gpu) {
     case 'none':
       return { kind: '', node: '', setup: '', reason: "WSL gives AgentBox's distro no GPU (no /dev/dxg): it needs Windows 10 21H2 or later, a current WSL (wsl --update) and a GPU driver with WSL support" };
+    case 'vm':
+      // What a Linux (Cloud Hypervisor) VM said before it could have the GPU.
+      return { kind: '', node: '', setup: '', reason: "AgentBox's VM has no GPU to give agents" };
+    case 'host':
+      return { kind: 'host', node: '/dev/dri/renderD129', setup: '', reason: '' };
+    case 'hostrestart':
+      return { kind: 'host', node: '/dev/dri/renderD129', setup: '', reason: 'the VM gets this GPU when it next starts: restart AgentBox\'s VM for agents to get it (agentbox vm stop, then agentbox vm start; agents stop with it).' };
+    case 'nvidia':
+      return { kind: '', node: '', setup: '', reason: "NVIDIA's proprietary driver can't share its memory with the VM (no dma-buf export in its Vulkan driver), which the VM's GPU needs: Venus and virgl run on AMD and Intel GPUs, and on NVIDIA's with nouveau" };
     case 'krunkit':
       return { kind: '', node: '', setup: 'available', reason: krunkit };
     case 'running':
@@ -1445,7 +1454,9 @@ let defaultsSettings = {
   usageStats: true,
   agentGPU: false,
   // WSL's GPU, or ?gpu=none for a VM with none, or ?gpu=krunkit|running|restart|failed
-  // for a Mac's krunkit VM whose GPU isn't ready.
+  // for a Mac's krunkit VM whose GPU isn't ready; ?gpu=host for a Linux host's GPU the VM
+  // gets at its next start, ?gpu=hostrestart for one turned on, waiting, ?gpu=nvidia for
+  // one it can't have, ?gpu=vm for a Linux VM with none.
   vmGPU: fixtureVMGPU(typeof location !== 'undefined' ? new URLSearchParams(location.search).get('gpu') : null),
   errorReports: true,
   prWatch: true,

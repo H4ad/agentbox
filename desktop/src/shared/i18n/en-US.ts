@@ -623,6 +623,8 @@ export const enUS = {
   'settings.agentGPU.unavailable': 'Unavailable: {reason}',
   'settings.agentGPU.wsl': 'WSL\'s GPU ({node}), through Mesa\'s Direct3D 12 driver.',
   'settings.agentGPU.renderNode': 'The VM\'s GPU ({node}).',
+  'settings.agentGPU.host': 'Your computer\'s GPU ({node}): AgentBox\'s VM gets it the next time it starts with this on.',
+  'settings.agentGPU.hostPending': 'Your computer\'s GPU ({node}): {reason}',
   'settings.agentGPU.setup.available': 'Turning it on readies the VM\'s GPU first: Debian\'s generic kernel, and a Vulkan driver built for the Mac, in a few minutes. The VM restarts on the new kernel when you next restart it, and goes back to its old kernel if the new one doesn\'t start.',
   'settings.agentGPU.setup.running': 'Readying the VM\'s GPU: a few minutes. Agents get it when it\'s done.',
   'settings.agentGPU.setup.restart': 'The VM\'s GPU is ready once the VM restarts on its new kernel: run agentbox vm stop, then agentbox vm start, when it suits you (its agents stop with it).',

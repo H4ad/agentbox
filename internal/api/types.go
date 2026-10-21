@@ -3201,13 +3201,17 @@ type TerminalTails struct {
 
 // VMGPU is the GPU AgentBox's VM has to give agents (Settings.VMGPU).
 type VMGPU struct {
-	// Kind is "dxg" (WSL's /dev/dxg), "render" (a DRM render node), or ""
-	// when the VM has none.
+	// Kind is "dxg" (WSL's /dev/dxg), "render" (a DRM render node), "host"
+	// (the Linux host's GPU, which the VM gets when it next starts with
+	// "GPU for agents" on, and agents nothing until then), or "" when the
+	// VM has none.
 	Kind string `json:"kind"`
-	// Node is the device: /dev/dxg or /dev/dri/renderD128.
+	// Node is the device: /dev/dxg or /dev/dri/renderD128, the host's for
+	// "host".
 	Node string `json:"node"`
 	// Reason says why the VM has none, when Kind is "", or why readying it
-	// failed (VMGPUSetupFailed).
+	// failed (VMGPUSetupFailed); and what's still to do, such as restarting
+	// the VM, when Kind is "host".
 	Reason string `json:"reason"`
 	// Setup is how far readying the GPU has got when the VM's can be readied
 	// but isn't ready, as on a Mac's krunkit VM: one of the VMGPUSetup values.

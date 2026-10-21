@@ -1,0 +1,55 @@
+From 2bef866113d211e995f6106cfd15f75112831520 Mon Sep 17 00:00:00 2001
+From: Leandro Ciric <noreply@agentbox>
+Date: Tue, 20 Oct 2026 22:31:13 +0000
+Subject: [PATCH] devices: gpu: a render-node parameter, for the render node
+ virglrenderer uses
+
+rutabaga hands virglrenderer the fd of a GPU path (get_drm_fd), but crosvm
+only ever adds Wayland paths, so virglrenderer takes the first render node
+readdir(/dev/dri) returns: on a machine with an integrated and a discrete
+GPU, often not the one wanted. --params '{"render-node":"/dev/dri/renderD128"}'
+adds it as a GPU path.
+---
+ devices/src/virtio/gpu/mod.rs        | 6 ++++++
+ devices/src/virtio/gpu/parameters.rs | 4 ++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/devices/src/virtio/gpu/mod.rs b/devices/src/virtio/gpu/mod.rs
+index c5d6977..3b837f3 100644
+--- a/devices/src/virtio/gpu/mod.rs
++++ b/devices/src/virtio/gpu/mod.rs
+@@ -1504,6 +1504,12 @@ impl Gpu {
+                 _ => error!("unknown rutabaga path"),
+             }
+         }
++        if let Some(render_node) = &gpu_parameters.render_node {
++            rutabaga_paths.push(RutabagaPath {
++                path: render_node.clone(),
++                path_type: RUTABAGA_PATH_TYPE_GPU,
++            });
++        }
+ 
+         let component = match gpu_parameters.mode {
+             GpuMode::Mode2D => RutabagaComponentType::Rutabaga2D,
+diff --git a/devices/src/virtio/gpu/parameters.rs b/devices/src/virtio/gpu/parameters.rs
+index f21e4d5..3626194 100644
+--- a/devices/src/virtio/gpu/parameters.rs
++++ b/devices/src/virtio/gpu/parameters.rs
+@@ -93,6 +93,9 @@ pub struct GpuParameters {
+     // When running with device sandboxing, the path of a directory available for
+     // scratch space.
+     pub snapshot_scratch_path: Option<PathBuf>,
++    // The render node virglrenderer renders GL on (/dev/dri/renderD*), handed to it through
++    // rutabaga's GPU path. Without it virglrenderer takes the first render node it finds.
++    pub render_node: Option<PathBuf>,
+ }
+ 
+ impl Default for GpuParameters {
+@@ -122,6 +125,7 @@ impl Default for GpuParameters {
+             allow_implicit_render_server_exec: false,
+             renderer_features: None,
+             snapshot_scratch_path: None,
++            render_node: None,
+         }
+     }
+ }

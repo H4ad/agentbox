@@ -1,0 +1,5 @@
+cloud-hypervisor:   0.000027s: <main> ERROR:./cloud-hypervisor/cloud-hypervisor/src/lib.rs:23 -- Fatal error: CreateHypervisor(HypervisorCreate(no supported hypervisor))
+Error: Cloud Hypervisor exited with the following chain of errors:
+  0: Failed to open hypervisor interface (is hypervisor interface available?)
+  1: Failed to create the hypervisor
+  2: no supported hypervisor
