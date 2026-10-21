@@ -1,0 +1,2 @@
+renderer: virgl (AMD Radeon RX 6600 (radeonsi, navi23, LLVM 19.1.7, DRM 3.59, 6.12.48))
+query and glFinish returned (result 0)

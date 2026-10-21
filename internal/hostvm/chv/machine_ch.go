@@ -117,7 +117,7 @@ func (m *chMachine) startGPU(ctx context.Context) {
 	// A fresh crosvm each time the VM starts: it serves one Cloud Hypervisor,
 	// and exits (with a panic, "failed to recover queue from worker") when
 	// that one's connection closes, which halt expects.
-	gpu, err := startChildEnv("crosvm", m.l.Bin(gpuDir+"/bin/crosvm"), crosvmArgs(m.l, n.Path), gpuEnv(m.l, os.Environ()), m.log)
+	gpu, err := startChildEnv("crosvm", m.l.Bin(gpuDir+"/bin/crosvm"), crosvmArgs(m.l, n.Path), gpuEnv(m.l, n.Path, os.Environ()), m.log)
 	if err == nil {
 		if err = waitSocket(ctx, gpu, m.l.GPUSocket()); err != nil {
 			gpu.stop(childGrace)

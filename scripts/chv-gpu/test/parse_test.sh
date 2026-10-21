@@ -137,6 +137,7 @@ has "crosvm: surfaceless off (EGL from the GBM device)" "$cl" '"surfaceless":fal
 has "crosvm: render-node" "$cl" '"render-node":"/dev/dri/renderD128"'
 has "crosvm: external-blob" "$cl" '"external-blob":true'
 hasnt "crosvm: no device-select layer for virgl_render_server (breaks Venus)" "$cl" "MESA_VK_DEVICE_SELECT"
+has "crosvm: Venus held to the node (virglrenderer patch)" "$cl" "VKR_RENDER_NODE=/dev/dri/renderD128 "
 eq "crosvm: no isolation by default" "${crosvm[0]} $isolation" "env none"
 CHVGPU_ISOLATE=unshare crosvm_command
 cl="${crosvm[*]}"
@@ -145,7 +146,7 @@ eq "crosvm: isolation recorded" "$isolation" "unshare"
 CHVGPU_ISOLATE=bwrap crosvm_command
 has "crosvm: kept to its node (bwrap)" "${crosvm[*]}" "bwrap --dev-bind / / --tmpfs /dev/dri --dev-bind /dev/dri/renderD128 /dev/dri/renderD128 --"
 CHVGPU_ISOLATE=none crosvm_command
-eq "crosvm: no isolation, crosvm itself" "${crosvm[0]} ${crosvm[6]}" "env /opt/x/bin/crosvm"
+eq "crosvm: no isolation, crosvm itself" "${crosvm[0]} ${crosvm[7]}" "env /opt/x/bin/crosvm"
 render_node=/dev/dri/renderD128 bin='' work='' isolation=''
 eq "ratio" "$(ratio 8015 4381)" "1.8"
 eq "ratio, nothing to divide" "$(ratio "" 4381)" "?"
@@ -183,7 +184,7 @@ serial() {
 all_good=(guest:guest-info.txt:0 glxinfo-gpu:glxinfo-virgl.txt:0 eglinfo-gpu:eglinfo-sw.txt:0
 	vulkaninfo-gpu:vulkaninfo-venus.txt:0 glmark2-gpu:glmark2-virgl.txt:0 vkmark-gpu:vkmark-venus.txt:0
 	glxinfo-sw:glxinfo-sw.txt:0 vulkaninfo-sw:vulkaninfo-sw.txt:0 glmark2-sw:glmark2-sw.txt:0
-	vkmark-sw:vkmark-sw.txt:0 dmesg-tail::0)
+	vkmark-sw:vkmark-sw.txt:0 query-fence-gpu:query-fence.txt:0 dmesg-tail::0)
 serial "${all_good[@]}" > "$tmp/serial"
 
 results "$tmp/serial" > "$tmp/results"
@@ -211,6 +212,8 @@ host_os="Ubuntu 24.04.3 LTS" host_kernel=6.14.0 host_cpu="AMD Ryzen 7 5800X"
 host_gpu_driver=amdgpu host_gpu_ids=1002:73ff host_mesa_v=25.0.7 host_virgl_v="not installed"
 host_vulkan_v="AMD Radeon RX 6600 (RADV NAVI23) (radv, discrete_gpu, Vulkan 1.4.305)"
 binaries="cloud-hypervisor 50.0 + Spectrum OS GPU patchset 50.0-spectrum0 (static, musl)"
+# The fixtures' GPU, so that this machine's own render nodes don't count.
+host_nodes='/dev/dri/renderD128|1002:73ff'
 
 problems=()
 out=$(summary "$tmp/serial")
@@ -224,6 +227,8 @@ has "summary: Vulkan GPU" "$out" "Vulkan (GPU):     Virtio-GPU Venus (AMD Radeon
 has "summary: Vulkan software" "$out" "Vulkan (software): llvmpipe (LLVM 19.1.7, 256 bits); llvmpipe (cpu), Vulkan 1.4.305"
 has "summary: glmark2" "$out" "glmark2:         GPU 8015, software 4381 (x1.8)"
 has "summary: vkmark" "$out" "vkmark:          GPU 21544, software 3124 (x6.9)"
+has "summary: query and fence" "$out" "GL query+fence:  ok"
+has "summary: one Venus GPU" "$out" "Venus GPUs:      1 listed"
 has "summary: no problems" "$out" "problems:        none"
 eq "summary: ends with its rule" "$(tail -n1 <<<"$out")" "-----"
 
@@ -271,6 +276,22 @@ has "node asked: none given" "$out" "GL node asked:   virglrenderer: no GPU path
 out=$(summary "$tmp/right")
 has "node asked: an unpatched rutabaga says nothing" "$out" "GL node asked:   crosvm didn't say"
 work='' isolation=''
+
+# A fence after a GL query that never signals (crosvm not polling
+# virglrenderer), and Venus listing the host's other GPU too.
+cat "$fx/vulkaninfo-venus.txt" "$fx/vulkaninfo-venus.txt" > "$tmp/two-venus.txt"
+serial guest:guest-info.txt:0 glxinfo-gpu:glxinfo-virgl.txt:0 vulkaninfo-gpu:"$tmp/two-venus.txt":0 \
+	query-fence-gpu::124 > "$tmp/hung"
+printf '%s\n' '[2026-10-21T08:00:05.000000000+00:00 WARN  rutabaga_gfx::virgl_renderer] timeout (5s) waiting for renderer poll() to finish.' \
+	'[2026-10-21T08:00:10.000000000+00:00 WARN  rutabaga_gfx::virgl_renderer] timeout (5s) waiting for renderer poll() to finish.' > "$tmp/w/crosvm.log"
+problems=() work=$tmp/w
+out=$(summary "$tmp/hung")
+has "hung: says so" "$out" "GL query+fence:  hung (a fence after a GL query never signalled)"
+has "hung: its problem" "$out" "  - query-fence-gpu: exit 124"
+has "hung: crosvm's log" "$out" "  - virglrenderer waited on crosvm to poll it 2 time(s): fences after a GL query never signal"
+has "two Venus GPUs: counted" "$out" "Venus GPUs:      2 listed"
+has "two Venus GPUs: a problem" "$out" "  - Venus listed 2 host GPUs, not only /dev/dri/renderD128's"
+work=''
 
 # Venus failing, glmark2 on the GPU falling back to llvmpipe.
 serial guest:guest-info.txt:0 glxinfo-gpu:glxinfo-sw.txt:0 eglinfo-gpu:eglinfo-sw.txt:0 \

@@ -1,0 +1,239 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leandro Ciric <noreply@agentbox>
+Date: Wed, 21 Oct 2026 03:30:21 +0000
+Subject: [PATCH] venus: VKR_RENDER_NODE holds Venus to one render node's GPU
+
+Venus lists every Vulkan device the host has, so a guest given the
+discrete GPU sees the integrated one too. With VKR_RENDER_NODE set to a
+render node, the instance lists only the physical devices on it
+(VK_EXT_physical_device_drm), and vkEnumeratePhysicalDeviceGroups only the
+groups wholly made of those: a group with another device in it would fail
+the lookup that maps its handles to object ids. Mesa's device-select layer
+can't stand in for this; in the render server it makes
+vkEnumeratePhysicalDeviceGroups fail.
+---
+ src/venus/vkr_physical_device.c | 166 +++++++++++++++++++++++++++-----
+ 1 file changed, 141 insertions(+), 25 deletions(-)
+
+diff --git a/src/venus/vkr_physical_device.c b/src/venus/vkr_physical_device.c
+index ea72d7b..1bdd2ae 100644
+--- a/src/venus/vkr_physical_device.c
++++ b/src/venus/vkr_physical_device.c
+@@ -11,6 +11,9 @@
+ #include "vkr_device.h"
+ #include "vkr_instance.h"
+ 
++#include <sys/stat.h>
++#include <sys/sysmacros.h>
++
+ #ifdef HAVE_LINUX_UDMABUF_H
+ #include <fcntl.h>
+ 
+@@ -98,6 +101,98 @@ vkr_physical_device_destroy(struct vkr_context *ctx,
+    vkr_context_remove_object(ctx, &physical_dev->base);
+ }
+ 
++/* Whether a physical device renders on the render node with device number
++ * node, as VK_EXT_physical_device_drm tells. A device without the extension
++ * can't be told apart, and isn't.
++ */
++static bool
++vkr_physical_device_on_render_node(struct vkr_instance *instance,
++                                   VkPhysicalDevice handle,
++                                   dev_t node)
++{
++   VkInstance inst = instance->base.handle.instance;
++   PFN_vkEnumerateDeviceExtensionProperties enumerate_extensions =
++      (PFN_vkEnumerateDeviceExtensionProperties)instance->get_proc_addr(
++         inst, "vkEnumerateDeviceExtensionProperties");
++   PFN_vkGetPhysicalDeviceProperties2 get_properties2 =
++      (PFN_vkGetPhysicalDeviceProperties2)instance->get_proc_addr(
++         inst, "vkGetPhysicalDeviceProperties2");
++   if (!enumerate_extensions || !get_properties2)
++      return false;
++
++   uint32_t count = 0;
++   if (enumerate_extensions(handle, NULL, &count, NULL) != VK_SUCCESS || !count)
++      return false;
++   VkExtensionProperties *exts = calloc(count, sizeof(*exts));
++   if (!exts)
++      return false;
++   bool has_drm = false;
++   if (enumerate_extensions(handle, NULL, &count, exts) == VK_SUCCESS) {
++      for (uint32_t i = 0; i < count; i++) {
++         if (!strcmp(exts[i].extensionName, VK_EXT_PHYSICAL_DEVICE_DRM_EXTENSION_NAME))
++            has_drm = true;
++      }
++   }
++   free(exts);
++   if (!has_drm)
++      return false;
++
++   VkPhysicalDeviceDrmPropertiesEXT drm = {
++      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT,
++   };
++   VkPhysicalDeviceProperties2 props = {
++      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
++      .pNext = &drm,
++   };
++   get_properties2(handle, &props);
++   return drm.hasRender &&
++          makedev((unsigned)drm.renderMajor, (unsigned)drm.renderMinor) == node;
++}
++
++/* VKR_RENDER_NODE, when set to a render node (/dev/dri/renderD128), holds
++ * Venus to the GPU on it: the instance lists only the physical devices on that
++ * node, as GL renders on the node crosvm's render-node gives vrend. Without
++ * it, Venus lists every GPU the host has. The device-select layer can't do
++ * this for us: it breaks vkEnumeratePhysicalDeviceGroups here. When no device
++ * matches, the filter is left off, and says so.
++ */
++static uint32_t
++vkr_instance_filter_render_node(struct vkr_instance *instance,
++                                VkPhysicalDevice *handles,
++                                uint32_t count)
++{
++   const char *path = getenv("VKR_RENDER_NODE");
++   if (!path || !*path)
++      return count;
++
++   struct stat st;
++   if (stat(path, &st) || !S_ISCHR(st.st_mode)) {
++      vkr_log("VKR_RENDER_NODE=%s isn't a device: listing every GPU", path);
++      return count;
++   }
++
++   uint32_t kept = 0;
++   for (uint32_t i = 0; i < count; i++) {
++      if (vkr_physical_device_on_render_node(instance, handles[i], st.st_rdev))
++         handles[kept++] = handles[i];
++   }
++   if (!kept) {
++      vkr_log("no Vulkan device is on VKR_RENDER_NODE=%s: listing every GPU", path);
++      return count;
++   }
++   return kept;
++}
++
++static bool
++vkr_instance_has_physical_device(struct vkr_instance *instance, VkPhysicalDevice handle)
++{
++   for (uint32_t i = 0; i < instance->physical_device_count; i++) {
++      if (instance->physical_device_handles[i] == handle)
++         return true;
++   }
++   return false;
++}
++
+ static VkResult
+ vkr_instance_enumerate_physical_devices(struct vkr_instance *instance)
+ {
+@@ -126,6 +221,8 @@ vkr_instance_enumerate_physical_devices(struct vkr_instance *instance)
+       return result;
+    }
+ 
++   count = vkr_instance_filter_render_node(instance, handles, count);
++
+    instance->physical_device_count = count;
+    instance->physical_device_handles = handles;
+    instance->physical_devices = physical_devs;
+@@ -446,37 +543,58 @@ vkr_dispatch_vkEnumeratePhysicalDeviceGroups(
+    if (args->ret != VK_SUCCESS)
+       return;
+ 
++   /* All of the host's groups, of which the guest sees those wholly on the
++    * physical devices the instance lists (vkr_instance_filter_render_node).
++    */
++   struct vn_instance_proc_table *vk = &instance->proc_table;
+    VkPhysicalDeviceGroupProperties *orig_props = args->pPhysicalDeviceGroupProperties;
+-   if (orig_props) {
+-      args->pPhysicalDeviceGroupProperties =
+-         calloc(*args->pPhysicalDeviceGroupCount, sizeof(*orig_props));
+-      if (!args->pPhysicalDeviceGroupProperties) {
+-         args->ret = VK_ERROR_OUT_OF_HOST_MEMORY;
+-         return;
+-      }
++   uint32_t *orig_count = args->pPhysicalDeviceGroupCount;
++   vn_replace_vkEnumeratePhysicalDeviceGroups_args_handle(args);
++
++   uint32_t host_count = 0;
++   args->ret = vk->EnumeratePhysicalDeviceGroups(args->instance, &host_count, NULL);
++   if (args->ret != VK_SUCCESS)
++      return;
++   VkPhysicalDeviceGroupProperties *groups =
++      calloc(host_count ? host_count : 1, sizeof(*groups));
++   if (!groups) {
++      args->ret = VK_ERROR_OUT_OF_HOST_MEMORY;
++      return;
++   }
++   for (uint32_t i = 0; i < host_count; i++)
++      groups[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES;
++   args->ret = vk->EnumeratePhysicalDeviceGroups(args->instance, &host_count, groups);
++   if (args->ret != VK_SUCCESS && args->ret != VK_INCOMPLETE) {
++      free(groups);
++      return;
++   }
+ 
+-      for (uint32_t i = 0; i < *args->pPhysicalDeviceGroupCount; i++) {
+-         args->pPhysicalDeviceGroupProperties[i].sType =
+-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES;
++   uint32_t kept = 0;
++   for (uint32_t i = 0; i < host_count; i++) {
++      bool listed = groups[i].physicalDeviceCount > 0;
++      for (uint32_t j = 0; j < groups[i].physicalDeviceCount; j++) {
++         if (!vkr_instance_has_physical_device(instance, groups[i].physicalDevices[j]))
++            listed = false;
+       }
++      if (listed)
++         groups[kept++] = groups[i];
+    }
+ 
+-   struct vn_instance_proc_table *vk = &instance->proc_table;
+-   vn_replace_vkEnumeratePhysicalDeviceGroups_args_handle(args);
+-   args->ret =
+-      vk->EnumeratePhysicalDeviceGroups(args->instance, args->pPhysicalDeviceGroupCount,
+-                                        args->pPhysicalDeviceGroupProperties);
+-   if (args->ret != VK_SUCCESS)
++   if (!orig_props) {
++      *orig_count = kept;
++      args->ret = VK_SUCCESS;
++      free(groups);
+       return;
++   }
+ 
+-   if (!orig_props)
+-      return;
++   uint32_t count = MIN2(kept, *orig_count);
++   args->ret = count < kept ? VK_INCOMPLETE : VK_SUCCESS;
++   *orig_count = count;
+ 
+    /* TODO avoid requiring venus driver to call vkEnumeratePhysicalDevices first */
+    /* replace VkPhysicalDevice handles by object ids */
+-   for (uint32_t i = 0; i < *args->pPhysicalDeviceGroupCount; i++) {
+-      const VkPhysicalDeviceGroupProperties *props =
+-         &args->pPhysicalDeviceGroupProperties[i];
++   for (uint32_t i = 0; i < count; i++) {
++      const VkPhysicalDeviceGroupProperties *props = &groups[i];
+       VkPhysicalDeviceGroupProperties *out = &orig_props[i];
+ 
+       out->physicalDeviceCount = props->physicalDeviceCount;
+@@ -487,8 +605,7 @@ vkr_dispatch_vkEnumeratePhysicalDeviceGroups(
+          if (!physical_dev) {
+             vkr_log("venus driver is required to call vkEnumeratePhysicalDevices first");
+             args->ret = VK_ERROR_INITIALIZATION_FAILED;
+-            if (orig_props)
+-               free(args->pPhysicalDeviceGroupProperties);
++            free(groups);
+             return;
+          }
+ 
+@@ -497,8 +614,7 @@ vkr_dispatch_vkEnumeratePhysicalDeviceGroups(
+       }
+    }
+ 
+-   free(args->pPhysicalDeviceGroupProperties);
+-   args->pPhysicalDeviceGroupProperties = orig_props;
++   free(groups);
+ }
+ 
+ static void

@@ -113,8 +113,9 @@ type VMGPU struct {
 	// Reason says why there is none, for Settings to show beside the switch.
 	Reason string
 	// Vulkan is the host GPU's PCI vendor:device ids, for the Linux VM's
-	// render node: Venus lists every GPU of the host, and agents' Vulkan is
-	// pointed at this one (vulkanProfile). "" elsewhere.
+	// render node: Venus lists only this GPU of the host's (the VM's
+	// virglrenderer is patched to), and agents' Vulkan is pointed at it before
+	// the guest's llvmpipe (vulkanProfile). "" elsewhere.
 	Vulkan string
 }
 
@@ -172,12 +173,13 @@ func vmVulkanDevice() string {
 	return st.Vulkan
 }
 
-// vulkanProfile points an agent's Vulkan at the VM's GPU among those Venus
-// lists, with Mesa's device-select layer, which is harmless in the guest
-// (on the host, in Venus's render server, it breaks Venus).
+// vulkanProfile points an agent's Vulkan at the VM's GPU, before the guest's
+// llvmpipe and any other GPU an older Cloud Hypervisor build's Venus lists,
+// with Mesa's device-select layer, which is harmless in the guest (on the
+// host, in Venus's render server, it breaks Venus).
 func vulkanProfile(ids string) string {
 	return `# Written by AgentBox: "GPU for agents" (internal/agent/gpu.go).
-# Venus lists every GPU of the host: Vulkan uses the one AgentBox's VM was given.
+# Vulkan uses the GPU AgentBox's VM was given, not llvmpipe.
 export MESA_VK_DEVICE_SELECT=` + ids + `
 `
 }
