@@ -217,9 +217,10 @@ passt_bin() {
 
 # The guest's packages: Mesa's GL drivers (virgl and llvmpipe), its Vulkan
 # drivers (Venus is virtio_icd, lavapipe lvp_icd), the tools that report on
-# them, and an X server for the GL ones.
+# them, an X server for the GL ones, and a compiler for guest/query-fence.c.
 guest_packages=(mesa-utils mesa-utils-bin vulkan-tools mesa-vulkan-drivers
-	libgl1-mesa-dri libegl-mesa0 glmark2-x11 vkmark xserver-xorg-core pciutils)
+	libgl1-mesa-dri libegl-mesa0 glmark2-x11 vkmark xserver-xorg-core pciutils
+	gcc libc6-dev libegl-dev libgles-dev)
 
 # render_ids NODE: a render node's "vendor:device", as Mesa's device-select
 # layer takes it, or nothing.
@@ -255,6 +256,9 @@ write_files:
     permissions: '0755'
     encoding: b64
     content: $(base64 -w0 < "$here/guest/run-tests.sh")
+  - path: /usr/local/share/chv-gpu/query-fence.c
+    encoding: b64
+    content: $(base64 -w0 < "$here/guest/query-fence.c")
 runcmd:
   - [/usr/local/sbin/chv-gpu-run-tests]
 EOF
@@ -385,12 +389,14 @@ crosvm_command() {
 	# GPU path, and rutabaga (patched: 0.1.75 rejected every render node, its
 	# Path::starts_with comparing whole components) gives virglrenderer its
 	# fd, for GL's GBM device. crosvm.log says "virglrenderer: using GPU path".
-	# Venus's Vulkan, in virgl_render_server, lists every host GPU; the guest
-	# puts this one first (run-tests.sh). Not Mesa's device-select layer here
-	# nor DRI_PRIME: in virgl_render_server the layer breaks Venus
+	# Venus's Vulkan, in virgl_render_server, lists only the GPU on the node
+	# in VKR_RENDER_NODE (our virglrenderer patch; the render server inherits
+	# crosvm's environment). Not Mesa's device-select layer here nor
+	# DRI_PRIME: in virgl_render_server the layer breaks Venus
 	# (vkEnumeratePhysicalDeviceGroups returns devices vkr never saw,
 	# ERROR_INITIALIZATION_FAILED), and virglrenderer's own node choice
-	# ignores DRI_PRIME. --isolate-gpu also hides the other render nodes from
+	# ignores DRI_PRIME. AgentBox's supervisor gives crosvm the same
+	# (gpuEnv in internal/hostvm/chv/gpu.go). --isolate-gpu also hides the other render nodes from
 	# crosvm (gpu_isolation), but on a user's RX 6750 XT that made vrend's
 	# winsys fail and both GL and Venus fall back to software.
 	# surfaceless off: EGL from the GBM device on that node, not Mesa's
@@ -407,6 +413,7 @@ crosvm_command() {
 	# stub, which still gives the guest a scanout for its X server.
 	local base=(env -u DISPLAY -u WAYLAND_DISPLAY
 		RENDER_SERVER_EXEC_PATH="$bin/libexec/virgl_render_server"
+		VKR_RENDER_NODE="$dri/$(basename "$node")"
 		"$bin/bin/crosvm" --no-syslog device gpu --socket-path "$work/gpu.sock" --params "$params")
 	isolation=$(gpu_isolation)
 	case "$isolation" in
@@ -578,6 +585,15 @@ summary() {
 	vk_line "Vulkan (software):" "$vk_sw"
 	echo "glmark2:         GPU ${g_gpu:-failed}, software ${g_sw:-failed} (x$(ratio "$g_gpu" "$g_sw"))"
 	echo "vkmark:          GPU ${v_gpu:-failed}, software ${v_sw:-failed} (x$(ratio "$v_gpu" "$v_sw"))"
+	local fence_rc venus_gpus
+	fence_rc=$(section_rc "$tmp" query-fence-gpu)
+	case "$fence_rc" in
+	0) echo "GL query+fence:  ok" ;;
+	124 | 137) echo "GL query+fence:  hung (a fence after a GL query never signalled)" ;;
+	*) echo "GL query+fence:  failed ($fence_rc)" ;;
+	esac
+	venus_gpus=$(section "$tmp" vulkaninfo-gpu | grep -c 'deviceName.*Venus' || true)
+	echo "Venus GPUs:      $venus_gpus listed"
 	# Where GL and Vulkan ran, as lines of their own (computed below).
 	local where_gl where_vk vk_ids_shown
 	where_gl=$(head -n1 <<<"${gl_nodes:-}")
@@ -594,7 +610,7 @@ summary() {
 
 	# What went wrong, from what the guest printed.
 	local name rc
-	for name in glxinfo-gpu eglinfo-gpu vulkaninfo-gpu glmark2-gpu vkmark-gpu glxinfo-sw vulkaninfo-sw glmark2-sw vkmark-sw; do
+	for name in glxinfo-gpu eglinfo-gpu vulkaninfo-gpu glmark2-gpu vkmark-gpu query-fence-gpu glxinfo-sw vulkaninfo-sw glmark2-sw vkmark-sw; do
 		rc=$(section_rc "$tmp" "$name")
 		case "$rc" in
 		0) ;;
@@ -616,6 +632,7 @@ summary() {
 	if [ -n "$vk_ids" ] && [ -n "$want_ids" ] && [ "$vk_ids" != "$want_ids" ]; then
 		problem "Vulkan ran on $vk_ids${vk_node:+ ($vk_node)}, not $render_node's $want_ids"
 	fi
+	[ "${venus_gpus:-0}" -gt 1 ] && problem "Venus listed $venus_gpus host GPUs, not only $render_node's"
 	# Without crosvm's node (a log read later), the GPUs' names tell.
 	gl_host=$(host_gpu "${gl_gpu%%|*}")
 	IFS='|' read -r _ _ vk_host _ <<<"$vk_gpu"
@@ -647,6 +664,8 @@ blob_problems() {
 	local n
 	n=$(grep -c "create external mapping" "$1" || true)
 	[ "$n" -gt 0 ] && problem "crosvm sent $n blob(s) as EXTERNAL_MAP, which Spectrum's patchset doesn't implement (external-blob off?)"
+	n=$(grep -c "waiting for renderer poll() to finish" "$1" || true)
+	[ "$n" -gt 0 ] && problem "virglrenderer waited on crosvm to poll it $n time(s): fences after a GL query never signal"
 	n=$(grep -c "can't fallback to external mapping" "$1" || true)
 	[ "$n" -gt 0 ] && problem "$n blob(s) couldn't be exported as an fd to map into the guest (opaque Vulkan memory, or GL without GL_EXT_memory_object_fd on the host)"
 	return 0

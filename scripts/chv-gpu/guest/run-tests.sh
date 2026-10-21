@@ -79,6 +79,14 @@ icd=/usr/share/vulkan/icd.d
 	run glmark2-sw 300 glmark2 "${glmark[@]}"
 	run vkmark-sw 300 vkmark "${vkmark[@]}"
 )
+# Last, as it wedges every GL user of the GPU when it fails (Xorg's glamor
+# too): a GL query, then glFinish. A fence after a query that never signals
+# hangs it, and every fence after it.
+(
+	export VK_DRIVER_FILES=$icd/virtio_icd.json VK_ICD_FILENAMES=$icd/virtio_icd.json
+	cc -O2 -o /usr/local/bin/chv-gpu-query-fence /usr/local/share/chv-gpu/query-fence.c -lEGL -lGLESv2 &&
+		run query-fence-gpu 30 chv-gpu-query-fence
+)
 run dmesg-tail 10 sh -c "dmesg | grep -iE 'virtio|drm|gpu|venus|fault' | tail -n 30"
 
 # Quiet the kernel on the console so nothing lands inside the results.

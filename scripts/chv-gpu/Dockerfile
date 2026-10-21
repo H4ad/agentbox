@@ -46,9 +46,14 @@ COPY fetch-git.sh /usr/local/bin/fetch-git
 # can only hand Cloud Hypervisor a blob as an fd (SHMEM_MAP): Spectrum's
 # patchset has no EXTERNAL_MAP, the fallback that passes a pointer into
 # crosvm's own memory.
+# Our patch holds Venus to the render node GL renders on (patches/README.md).
 ARG VIRGLRENDERER_REPO
 ARG VIRGLRENDERER_COMMIT
+COPY patches/virglrenderer/ /src/patches/virglrenderer/
 RUN fetch-git virglrenderer "$VIRGLRENDERER_COMMIT" "$VIRGLRENDERER_REPO" && \
+    for p in /src/patches/virglrenderer/*.patch; do \
+      patch -d virglrenderer -p1 --no-backup-if-mismatch < "$p" || exit 1; \
+    done && \
     cd virglrenderer && \
     meson setup build --prefix="$PREFIX" --libdir=lib --buildtype=release \
       -Dvenus=true -Drender-server=true -Dplatforms=egl,glx -Dminigbm_allocation=true \

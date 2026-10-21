@@ -56,6 +56,23 @@ the GPU and checks they say the same.
   the integrated one. crosvm runs with `"surfaceless": false` too, since a surfaceless EGL
   display is Mesa's default device whatever the fd.
 
+- `0002-vhost-user-gpu-poll-the-renderer.patch`: ours, not upstream (crosvm's main doesn't have it
+  either). The vhost-user GPU backend never polled virglrenderer's poll descriptor, which the
+  in-process device does (`WorkerToken::VirtioGpuPoll`). With async fence callbacks, a fence while
+  a GL query is pending waits for that poll, so the first fence after a query never signalled, and
+  no fence after it did either. The patch adds a platform worker that calls `event_poll` whenever the
+  descriptor is readable, on the backend's executor thread as the control queue's worker runs.
+
+## virglrenderer/: virglrenderer 1.2.0
+
+- `0001-venus-render-node.patch`: ours. `VKR_RENDER_NODE` in the render server's environment (it
+  inherits crosvm's) holds Venus to that render node's GPU: the instance lists only the physical
+  devices whose `VK_EXT_physical_device_drm` render node it is, and `vkEnumeratePhysicalDeviceGroups`
+  only the groups made wholly of those, since a group with another device in it fails vkr's lookup of
+  its handles. When no device matches (a driver without the extension), the filter is off and the
+  render server logs it. Mesa's device-select layer can't do this in the render server: there it
+  makes `vkEnumeratePhysicalDeviceGroups` fail.
+
 ## rutabaga_gfx/: the crates.io crate rutabaga_gfx 0.1.75, which crosvm renders with
 
 Fetched at the version and checksum crosvm's Cargo.lock pins, then used from a path, with cargo

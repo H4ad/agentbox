@@ -105,8 +105,8 @@ func TestCrosvmArgsAndEnv(t *testing.T) {
 		}
 	}
 
-	env := gpuEnv(l, []string{"HOME=/h", "DISPLAY=:0", "WAYLAND_DISPLAY=wayland-1", "MESA_VK_DEVICE_SELECT=8086:a780", "DRI_PRIME=1"})
-	if !slices.Equal(env, []string{"HOME=/h", "RENDER_SERVER_EXEC_PATH=/v/bin/gpu/libexec/virgl_render_server"}) {
+	env := gpuEnv(l, amdDiscrete.Path, []string{"HOME=/h", "DISPLAY=:0", "WAYLAND_DISPLAY=wayland-1", "MESA_VK_DEVICE_SELECT=8086:a780", "DRI_PRIME=1", "VKR_RENDER_NODE=/dev/dri/renderD129"})
+	if !slices.Equal(env, []string{"HOME=/h", "RENDER_SERVER_EXEC_PATH=/v/bin/gpu/libexec/virgl_render_server", "VKR_RENDER_NODE=" + amdDiscrete.Path}) {
 		t.Errorf("env: %q", env)
 	}
 }

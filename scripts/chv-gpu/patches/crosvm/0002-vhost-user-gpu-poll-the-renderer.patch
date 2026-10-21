@@ -1,0 +1,88 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leandro Ciric <noreply@agentbox>
+Date: Wed, 21 Oct 2026 03:28:35 +0000
+Subject: [PATCH] devices: vhost-user: gpu: poll the renderer, so fences after
+ a query signal
+
+virglrenderer with async fence callbacks (rutabaga's default) retires a
+fence while a query is pending only after the device calls
+virgl_renderer_poll(): the sync thread writes the poll eventfd and waits
+for it ("timeout (5s) waiting for renderer poll() to finish", every 5 s).
+The in-process device adds the descriptor to its wait context
+(WorkerToken::VirtioGpuPoll); the vhost-user backend never did, so the
+first fence after a GL query (Chromium, glamor) never signalled, and no
+fence after it did either: every draw in the guest hung in
+dma_fence_default_wait.
+---
+ devices/src/virtio/gpu/mod.rs                 |  5 +++
+ .../vhost_user_backend/gpu/sys/linux.rs       | 34 +++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/devices/src/virtio/gpu/mod.rs b/devices/src/virtio/gpu/mod.rs
+index 3b837f3bd..dfa261a4e 100644
+--- a/devices/src/virtio/gpu/mod.rs
++++ b/devices/src/virtio/gpu/mod.rs
+@@ -814,6 +814,11 @@ impl Frontend {
+     pub fn event_poll(&self) {
+         self.virtio_gpu.event_poll();
+     }
++
++    /// The renderer's eventfd, readable when it needs `event_poll`.
++    pub fn poll_descriptor(&self) -> Option<SafeDescriptor> {
++        self.virtio_gpu.poll_descriptor()
++    }
+ }
+ 
+ #[derive(EventToken, PartialEq, Eq, Clone, Copy, Debug)]
+diff --git a/devices/src/virtio/vhost_user_backend/gpu/sys/linux.rs b/devices/src/virtio/vhost_user_backend/gpu/sys/linux.rs
+index 8534e90fc..471a4eeea 100644
+--- a/devices/src/virtio/vhost_user_backend/gpu/sys/linux.rs
++++ b/devices/src/virtio/vhost_user_backend/gpu/sys/linux.rs
+@@ -75,6 +75,25 @@ async fn run_resource_bridge(tube: IoSource<Tube>, state: Rc<RefCell<gpu::Fronte
+     }
+ }
+ 
++// virglrenderer with async fence callbacks (rutabaga's default) retires a
++// fence while a query is pending only once the device has called
++// virgl_renderer_poll(): its sync thread writes the poll eventfd and blocks
++// until then. The in-process device polls it (WorkerToken::VirtioGpuPoll);
++// without this, the first fence after a query never signals, nor does any
++// fence after it.
++async fn run_renderer_poll(
++    poll: IoSource<AsyncWrapper<SafeDescriptor>>,
++    state: Rc<RefCell<gpu::Frontend>>,
++) {
++    loop {
++        if let Err(e) = poll.wait_readable().await {
++            error!("Failed to wait for the renderer's poll descriptor: {}", e);
++            break;
++        }
++        state.borrow_mut().event_poll();
++    }
++}
++
+ impl GpuBackend {
+     pub fn start_platform_workers(&mut self, _interrupt: Interrupt) -> anyhow::Result<()> {
+         let state = self
+@@ -97,6 +116,21 @@ impl GpuBackend {
+                 .context("sending the run_resource_bridge task")?;
+         }
+ 
++        // Start polling the renderer, when it has a descriptor to poll.
++        let poll = state.borrow().poll_descriptor();
++        if let Some(poll) = poll {
++            let poll = self
++                .ex
++                .async_from(AsyncWrapper::new(poll))
++                .context("failed to create async poll descriptor")?;
++            let task = self
++                .ex
++                .spawn_local(run_renderer_poll(poll, state.clone()));
++            self.platform_worker_tx
++                .unbounded_send(task)
++                .context("sending the run_renderer_poll task")?;
++        }
++
+         // Start handling the display.
+         let display = clone_descriptor(&*state.borrow_mut().display().borrow())
+             .map(AsyncWrapper::new)

@@ -60,8 +60,8 @@ type GPUStatus struct {
 	Node string `json:"node,omitempty"`
 	GPU  string `json:"gpu,omitempty"`
 	// Vulkan is the GPU's PCI vendor:device ids, when the VM has it: Venus
-	// lists every GPU of the host, and agents' Vulkan picks this one
-	// (MESA_VK_DEVICE_SELECT, package agent).
+	// lists only this GPU (VKR_RENDER_NODE, gpuEnv), and agents' Vulkan picks
+	// it before the guest's llvmpipe (MESA_VK_DEVICE_SELECT, package agent).
 	Vulkan string `json:"vulkan,omitempty"`
 	// Reason says what's wrong, or what the user has to do, in a sentence.
 	Reason string `json:"reason,omitempty"`
@@ -313,21 +313,21 @@ func crosvmArgs(l Layout, node string) []string {
 }
 
 // gpuEnv is crosvm's environment: the host's, but for a display, with the
-// render server it starts for Venus. Nothing picks a Vulkan device: Mesa's
-// device-select layer (MESA_VK_DEVICE_SELECT, DRI_PRIME) in the render
-// server breaks Venus (vkEnumeratePhysicalDeviceGroups fails). Venus lists
-// every host GPU, and the guest picks: agents get MESA_VK_DEVICE_SELECT for
-// the VM's (GPUStatus.Vulkan, package agent).
-func gpuEnv(l Layout, environ []string) []string {
+// render server it starts for Venus, held to node by VKR_RENDER_NODE (our
+// virglrenderer patch), which the render server inherits: without it Venus
+// lists every host GPU, an integrated one too. Nothing else picks a Vulkan
+// device: Mesa's device-select layer (MESA_VK_DEVICE_SELECT, DRI_PRIME) in the
+// render server breaks Venus (vkEnumeratePhysicalDeviceGroups fails).
+func gpuEnv(l Layout, node string, environ []string) []string {
 	env := slices.DeleteFunc(slices.Clone(environ), func(kv string) bool {
 		k, _, _ := strings.Cut(kv, "=")
 		switch k {
-		case "DISPLAY", "WAYLAND_DISPLAY", "RENDER_SERVER_EXEC_PATH", "MESA_VK_DEVICE_SELECT", "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE", "DRI_PRIME":
+		case "DISPLAY", "WAYLAND_DISPLAY", "RENDER_SERVER_EXEC_PATH", "VKR_RENDER_NODE", "MESA_VK_DEVICE_SELECT", "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE", "DRI_PRIME":
 			return true
 		}
 		return false
 	})
-	return append(env, "RENDER_SERVER_EXEC_PATH="+l.Bin(gpuDir+"/libexec/virgl_render_server"))
+	return append(env, "RENDER_SERVER_EXEC_PATH="+l.Bin(gpuDir+"/libexec/virgl_render_server"), "VKR_RENDER_NODE="+node)
 }
 
 // guestGPUFile is where the supervisor tells the daemon in the VM about the

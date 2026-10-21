@@ -180,9 +180,13 @@ llvmpipe or fail, as they should with no 3D.
     whole components) hands virglrenderer its fd. With `surfaceless` off, EGL comes from the GBM
     device on that node. crosvm.log says `virglrenderer: using GPU path "/dev/dri/renderD…"`, and
     the summary repeats it.
-  - **Vulkan:** Venus lists every host GPU, and the guest puts the chosen one first (Mesa's
-    device-select layer, in the guest; AgentBox's agents get `MESA_VK_DEVICE_SELECT` in their
-    profile from what the supervisor tells the VM).
+  - **Vulkan:** our virglrenderer patch holds Venus to the GPU on `VKR_RENDER_NODE`, which try.sh
+    and AgentBox's supervisor set to the same node in crosvm's environment, and the render server
+    inherits: the instance lists only the physical devices on that node (`VK_EXT_physical_device_drm`)
+    and the device groups made of them. Unpatched, Venus listed every host GPU, an integrated one
+    too. The summary's `Venus GPUs:` counts them. The guest still puts the chosen GPU first, before
+    llvmpipe (Mesa's device-select layer, in the guest; AgentBox's agents get `MESA_VK_DEVICE_SELECT`
+    in their profile from what the supervisor tells the VM).
   - `--isolate-gpu` (try.sh only) also runs crosvm where `/dev/dri` holds only that node. It's an
     experiment: on an RX 6750 XT, vrend's winsys failed to initialise there and GL and Venus both
     fell back to software.
@@ -192,6 +196,15 @@ llvmpipe or fail, as they should with no 3D.
     chosen GPU first with the layer, in the guest, where it's harmless.
   - **The summary** says where each ran: GL from the render node crosvm had open (by device number), Vulkan from the
     vendor:device vkmark used. It flags either one not on the chosen node.
+- **Fences after a GL query**: virglrenderer, as rutabaga sets it up (a sync thread, async fence
+  callbacks), retires a fence while a query is pending only once the device has called
+  `virgl_renderer_poll()`, which it asks for on an eventfd. crosvm's in-process GPU polls that fd;
+  its vhost-user backend, the one Cloud Hypervisor uses, didn't, so the first fence after a GL
+  query (Chromium and Xvnc's glamor make them) never signalled, nor did any after it: every draw in
+  the guest hung in `dma_fence_default_wait`, and crosvm logged `timeout (5s) waiting for renderer
+  poll() to finish` every 5 s. glmark2 and vkmark make no queries, so the spike never hit it. Our
+  crosvm patch `0002` polls it; the guest's `query-fence-gpu` check (guest/query-fence.c) makes a
+  query and then waits on a fence, and the summary's `GL query+fence:` says whether it returned.
 - **No display**: crosvm runs with its stub display, so the guest has a scanout (its X server
   works) but nothing is shown on the host. AgentBox's agents draw on their own virtual displays,
   so it's what we'd want, but crosvm's Wayland/X display paths aren't exercised.
