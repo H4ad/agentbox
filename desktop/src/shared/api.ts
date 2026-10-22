@@ -167,6 +167,9 @@ export interface Settings {
   autoStopIdle: boolean;
   dockerPruneOnStop: boolean;
   idleTimeSeconds: number;
+  idleReclaim: boolean;
+  idleFreezeSeconds: number;
+  idleStopSeconds: number;
   leadRecheck: boolean;
   leadRecheckMinutes: number;
   imageCache: boolean;
@@ -218,6 +221,9 @@ export interface UpdateSettingsRequest {
   autoStopIdle?: boolean;
   dockerPruneOnStop?: boolean;
   idleTimeSeconds?: number;
+  idleReclaim?: boolean;
+  idleFreezeSeconds?: number;
+  idleStopSeconds?: number;
   leadRecheck?: boolean;
   leadRecheckMinutes?: number;
   diskFloorMin?: number;
@@ -261,6 +267,7 @@ export interface Agent {
   changesRequested?: string;
   state: string;
   memory?: MemoryHold;
+  reclaimed?: string;
   ip: string;
   createdAt: string;
 }
@@ -703,6 +710,7 @@ export interface AgentChange {
   ip?: string;
   removed?: boolean;
   memory?: MemoryHold;
+  reclaimed?: string;
 }
 
 export interface Theme {
@@ -1690,6 +1698,7 @@ export interface FleetAgent {
   changesRequested?: string;
   state: string;
   memory?: MemoryHold;
+  reclaimed?: string;
   ip: string;
   createdAt: string;
   changes: AgentChanges;

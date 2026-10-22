@@ -87,6 +87,7 @@ import { projectSection } from "./ProjectSettings";
 import { SkillsPanel } from "./SkillsPanel";
 import { ConnectorsTab } from "./ConnectorsTab";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { IdleReclaim } from "./IdleReclaim";
 import { GlobalMemoryPanel } from "./GlobalMemoryPanel";
 import { phoneGroups } from "./PhoneSettings";
 import { SettingsPage, keepScroll, openSettingsSection, type SectionIcons } from "./SettingsPage";
@@ -1162,6 +1163,19 @@ function InstalledSettings({
               keywords: t("settings.entry.block-full-suite.keywords"),
               modified: changed((s) => s.blockFullSuite),
               render: () => <BlockFullSuite />,
+            },
+          ],
+        },
+        {
+          id: "experimental-memory",
+          title: t("settings.group.experimental-memory.title"),
+          entries: [
+            {
+              id: "idle-reclaim",
+              label: t("settings.idleReclaim.label"),
+              keywords: t("settings.entry.idle-reclaim.keywords"),
+              modified: changed((s) => s.idleReclaim),
+              render: () => <IdleReclaim />,
             },
           ],
         },
