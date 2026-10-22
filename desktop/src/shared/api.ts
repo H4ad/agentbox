@@ -158,6 +158,7 @@ export interface Settings {
   vmGPU: VMGPU;
   errorReports: boolean;
   prWatch: boolean;
+  agentFreeze: boolean;
   mediaRetention: string;
   language: string;
   timezone: string;
@@ -215,6 +216,7 @@ export interface UpdateSettingsRequest {
   blockFullSuite?: boolean;
   errorReports?: boolean;
   prWatch?: boolean;
+  agentFreeze?: boolean;
   mediaRetention?: string;
   language?: string;
   timezone?: string;
@@ -491,6 +493,8 @@ export interface StopAgentFailure {
 export interface MemoryHold {
   paused?: number;
   waiting?: number;
+  machine?: string;
+  ahead?: number;
   since: string;
   why?: string;
   stalled?: number;

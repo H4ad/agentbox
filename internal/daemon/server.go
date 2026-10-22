@@ -278,7 +278,12 @@ type Server struct {
 	// functions or a test's. oomSeen, under mu, is each machine's count of
 	// processes killed for its memory.max when last looked at, and
 	// loggedOnce what logOnce last logged under each key.
-	heavy          *heavyRuns
+	heavy *heavyRuns
+	// frozen (agentfreeze.go) is whole agents' machines paused for memory,
+	// with Settings → Experimental's switch, and machineCgroups what
+	// freezes them.
+	frozen         *fleetState
+	machineCgroups machineCgroups
 	pressureEvery  time.Duration // pressureInterval; 0 runs no loop
 	readPressure   func() (pressure.Sample, error)
 	runCgroups     runCgroups
@@ -293,6 +298,9 @@ type Server struct {
 	// wakeMu makes one start of a stopped machine for a message at a time
 	// (wake.go).
 	wakeMu sync.Mutex
+	// waking, under mu, are the agents whose machines start aside for a
+	// message, waiting for memory to boot (wakeAside).
+	waking map[string]bool
 	// The lead recheck (leadrecheck.go), under mu: when each project's lead
 	// was last rechecked, and what it was told then, so the same state isn't
 	// sent twice.
@@ -348,6 +356,8 @@ func New(cfg Config) (*Server, error) {
 		lan:              newLANState(),
 		usageEvery:       usageInterval,
 		heavy:            newHeavyRuns(),
+		frozen:           newFleetState(),
+		machineCgroups:   agentMachineCgroups{},
 		pressureEvery:    pressureInterval,
 		readPressure:     readSample(),
 		readCPUPressure:  func() (pressure.PSI, error) { return pressure.Read(cpuPressureFile) },
@@ -659,6 +669,7 @@ func (s *Server) manager(log io.Writer) *agent.Manager {
 		DesktopTheme:     s.desktopTheme,
 		ImageCacheSocket: s.imageCacheSocket,
 		PackageCacheDir:  s.packageCacheDir,
+		Admit:            s.admitMachine,
 		NodeModules:      s.nodeModules,
 		NodeModulesOn:    s.nodeModulesOn,
 		ShareRoom:        s.shareRoom,

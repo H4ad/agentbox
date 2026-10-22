@@ -159,6 +159,9 @@ func (s *Server) stepIdleReclaim(ctx context.Context, now time.Time) {
 				s.forgetFrozen(st.Ref()) // stopped or paused by something else
 				continue
 			}
+			if s.frozenForMemory(st.Ref()) {
+				continue // the fleet's (agentfreeze.go): not for idle reclaim to touch
+			}
 			if first {
 				// What a daemon before this one froze and didn't get to
 				// wake: this one knows nothing of it.
