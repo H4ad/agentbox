@@ -3584,7 +3584,7 @@ export const ptBR: Messages = {
   'panel.openChat': 'Abrir o chat de {name}',
   'panel.find': 'Encontrar um agente…',
   'panel.repository': 'Repositório',
-  'panel.lead.switch': 'Agentes, pull requests ou arquivos',
+  'panel.lead.switch': 'Agentes, pull requests, arquivos, evidências ou agendamentos',
   'panel.lead.agents': 'Agentes',
   'panel.repositorySub': '{project}: o checkout do líder, neste computador',
   'panel.host': 'Este computador',

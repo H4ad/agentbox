@@ -3583,7 +3583,7 @@ export const enUS = {
   'panel.openChat': 'Open the chat of {name}',
   'panel.find': 'Find an agent…',
   'panel.repository': 'Repository',
-  'panel.lead.switch': 'Agents, pull requests or files',
+  'panel.lead.switch': 'Agents, pull requests, files, evidence or schedules',
   'panel.lead.agents': 'Agents',
   'panel.repositorySub': '{project}: the lead’s checkout, on this computer',
   'panel.host': 'This computer',

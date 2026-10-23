@@ -10,14 +10,12 @@ import { api } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { projectLabel } from '../../lib/projectName';
 import { togglePin } from '../../lib/projectOrder';
-import { fitsBeside, openPanelOn, panelBack, setPanel, useChatPanel } from '../../lib/rightPanel';
 import { setPins, useV2Projects } from '../../lib/v2Projects';
 import { ProjectIcon } from '../ProjectIcon';
 import { Button } from '../ui/button';
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuMore, MenuSeparator, MenuTrigger } from '../ui/menu';
 import { Tip } from '../ui/tooltip';
 import { useOpenReview } from './ReviewV2';
-import { cn } from '../../lib/utils';
 import { TalkToProject } from './TalkToProject';
 import { openFanOut } from '../../lib/groups';
 
@@ -98,27 +96,6 @@ export function projectActions(
       { key: 'new-agent', icon: Plus, label: t('v2.menu.agentYourself'), onSelect: onNewAgent },
     ],
   };
-}
-
-// ProjectPlaces is the project's Settings: one click from the lead's chat, in
-// the right-hand panel, over whatever it shows. Clicked again, the panel goes
-// back to what it showed. Its Pull requests are a tab of that panel.
-export function ProjectPlaces({ leadRef }: { leadRef: string }) {
-  const t = useT();
-  const panel = useChatPanel(leadRef);
-  const on = (fitsBeside() || panel.open) && panel.wide === 'settings';
-  const toggle = () => {
-    if (on) return panelBack(leadRef);
-    setPanel({ section: 'general' });
-    openPanelOn(leadRef, 'settings');
-  };
-  return (
-    <Tip label={t('v2.sidebar.projectSettings')}>
-      <Button size="icon-sm" variant="ghost" aria-label={t('v2.sidebar.projectSettings')} aria-pressed={on} className={cn(on && 'bg-surface-raised text-primary')} onClick={toggle} data-project-settings>
-        <Settings />
-      </Button>
-    </Tip>
-  );
 }
 
 // ProjectMenu is the project's ⋯ in the top bar: the lead chat's New chat,
