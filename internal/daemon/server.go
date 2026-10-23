@@ -424,6 +424,8 @@ func New(cfg Config) (*Server, error) {
 		LeadLogins:        s.leadToolLogins,
 		Logf:              s.logf,
 		PermissionChanged: s.agentPermission,
+		IdleStop:          s.leadSleepAfter,
+		StayUp:            s.leadDueSoon,
 		Version:           Version,
 		ImageDir:          cfg.Paths.ChatImages,
 	}
