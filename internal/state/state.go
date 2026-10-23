@@ -1316,6 +1316,10 @@ var migrations = []string{
 	// machine was last stopped through AgentBox; 0 when never, or not since
 	// this column exists.
 	`ALTER TABLE agents ADD COLUMN stopped_at INTEGER NOT NULL DEFAULT 0`,
+	// A project secret the lead keeps fresh (a token its own script refreshes):
+	// a credential request for it wakes the lead, which may fulfil it from the
+	// stored value by name (fulfil_credential). Agents' own secrets stay 0.
+	`ALTER TABLE secrets ADD COLUMN lead_managed INTEGER NOT NULL DEFAULT 0`,
 }
 
 // DefaultMediaRetentionDays is what projects.media_retention_days reads as
