@@ -172,7 +172,7 @@ func measureChanges(a state.Agent) (api.AgentChanges, error) {
 	if _, err := os.Stat(a.Worktree); errors.Is(err, fs.ErrNotExist) {
 		return out, nil
 	}
-	stat, err := gitrepo.DiffWorktree(a.Worktree, a.BaseCommit, true)
+	stat, err := gitrepo.DiffWorktree(a.Worktree, gitrepo.DiffBase(a.Worktree, a.BaseRef, a.BaseCommit), true)
 	if err != nil {
 		return out, err
 	}
