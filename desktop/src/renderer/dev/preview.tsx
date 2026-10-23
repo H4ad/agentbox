@@ -61,6 +61,9 @@
 //   ?chat=stopped|paused    a stopped (or paused) agent's stored conversation,
 //                           readable, with Start (Resume) on the composer.
 //                           Start, or sending a message, wakes it after 1.5s
+//   ?chat=limited           a running agent's chat stopped on its Claude Code
+//                           account's usage limit, with another account that
+//                           has room; "Continue on work" moves it there
 //   ?app=agent-15&v2=1&review=1&sleep=stopped  a finished agent awaiting review whose machine sleeps: one bar
 //   ?chat=thinking          a Claude Code turn thinking: &phase=live the thought
 //                           still arriving, =answer the reply after it, =done
@@ -470,6 +473,31 @@ if (chat === 'lead') {
       { tool: 'cursor', name: 'Cursor', ready: false, installed: false, reason: 'Not signed in' },
     ],
   });
+}
+// An agent stopped on its account's limit, with the composer's accounts.
+const limitedRef = `${PROJECT}/limited`;
+if (chat === 'limited') {
+  const [personal, work] = claudeLimits();
+  const spent = { ...personal, status: 'rejected', windows: personal.windows.map((w) => (w.name === 'five_hour' ? { ...w, utilization: 1 } : w)) };
+  queryClient.setQueryData<T.LeadRunners>(['agentRunners', limitedRef], {
+    tool: 'claude',
+    account: 'personal',
+    runners: [{ tool: 'claude', name: 'Claude Code', ready: true, installed: true, accounts: [{ name: 'personal', default: true, project: true, agents: 3, limit: spent }, { name: 'work', default: false, project: false, agents: 0, limit: work }] }],
+  });
+  // Signed in, on both accounts, so the composer isn't the signed-out one.
+  queryClient.setQueryData<T.AuthStatus>(['auth'], (auth) => ({
+    ...(auth ?? { claude: true, codex: false, opencode: false, cursor: false, codexAccounts: [], openCodeAccounts: [], cursorAccounts: [], github: false, githubAccounts: [] }),
+    claude: true,
+    claudeAccounts: [{ name: 'personal', default: true, savedAt: personal.at }, { name: 'work', default: false, savedAt: work.at }],
+  }));
+  // The bridge has no chat or accounts to refetch after the switch: the
+  // preview's own copies, which the switch updates, stay.
+  const invalidate = queryClient.invalidateQueries.bind(queryClient);
+  queryClient.invalidateQueries = ((filters?: Parameters<typeof invalidate>[0]) =>
+    ['chat', 'agentRunners'].includes(String(filters?.queryKey?.[0])) ? Promise.resolve() : invalidate(filters)) as typeof invalidate;
+  const resumeAt = new Date(Date.now() + 3 * 3600_000).toISOString();
+  const thread = asleepChat(limitedRef);
+  queryClient.setQueryData<T.ChatThread>(['chat', limitedRef], { ...thread, session: { ...thread.session, state: 'ready', limited: true, limitedUntil: resumeAt, resumeAt } });
 }
 // Before the first render, so the chat reads it rather than the dev bridge.
 if (chat === 'stopped' || chat === 'paused') queryClient.setQueryData(['chat', asleepRef], asleepChat(asleepRef));
@@ -1008,6 +1036,10 @@ function Preview() {
                 </section>
               ))}
           </div>
+        ) : chat === 'limited' ? (
+          <div style={{ height: '100%', margin: -24 }}>
+            <LimitedChatPreview agent={fixtures.agents.find((a) => a.ref === `${PROJECT}/agent-99`)!} />
+          </div>
         ) : chat === 'stopped' || chat === 'paused' ? (
           <div style={{ height: '100%', margin: -24 }}>
             <AsleepChatPreview state={chat} agent={fixtures.agents.find((a) => a.ref === `${PROJECT}/agent-99`)!} />
@@ -1124,6 +1156,34 @@ function Preview() {
       <AgentRail view={view} onSelect={() => {}} onNewAgent={() => {}} />
     </div>
   );
+}
+
+// LimitedChatPreview moves its agent to another account the way the daemon
+// does: the limit clears and the turn carries on, saying so in a notice.
+function LimitedChatPreview({ agent }: { agent: T.Agent }) {
+  useEffect(() => {
+    api.setAgentRunner = async (_ref, req) => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const now = new Date().toISOString();
+      const notice: T.ChatItem = {
+        id: `moved-${now}`,
+        turn: 's3',
+        kind: 'notice',
+        text: `This chat moved to the Claude Code account "${req.account}": Claude Code restarts on it, resumes this conversation and carries on without waiting for the old account's limit.`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      let session: T.ChatSession = { state: 'ready', tool: 'claude', options: [], commands: [] };
+      queryClient.setQueryData<T.ChatThread>(['chat', limitedRef], (thread) => {
+        if (!thread) return thread;
+        session = { ...thread.session, limited: false, limitedUntil: undefined, resumeAt: undefined };
+        return { ...thread, session, items: [...thread.items, notice] };
+      });
+      queryClient.setQueryData<T.LeadRunners>(['agentRunners', limitedRef], (r) => r && { ...r, account: req.account });
+      return session;
+    };
+  }, []);
+  return <ChatTab agent={{ ...agent, ref: limitedRef, name: 'agent-97', title: 'Add a dark mode toggle', state: 'running', ai: 'claude', claudeAccount: 'personal' }} starting={false} onStart={() => {}} autoStart={false} />;
 }
 
 // AsleepChatPreview wakes its agent the way the daemon does: Start, or a
