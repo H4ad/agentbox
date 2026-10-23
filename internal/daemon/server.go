@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -477,6 +478,9 @@ func (s *Server) serve(ctx context.Context, socket string) error {
 	moved := s.moveDataToPool(ctx)
 	s.placeNodeModules()
 	defer s.startTracing()()
+	if limit := setMemoryLimit(); limit < math.MaxInt64 {
+		s.logf("soft memory limit %d MiB (GOMEMLIMIT sets another)", limit>>20)
+	}
 
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
@@ -560,6 +564,7 @@ func (s *Server) serve(ctx context.Context, socket string) error {
 	// API that their chats' tools call back is up.
 	loops.Go(func() { s.continueTurns(ctx) })
 	loops.Go(func() { s.rearmLimits(ctx) })
+	loops.Go(func() { s.unloadChats(ctx) })
 	// What an earlier release left queued starts now (leftoverqueue.go).
 	loops.Go(func() { s.startLeftoverQueue(ctx) })
 	s.startRemote(ctx)
@@ -578,7 +583,7 @@ func (s *Server) serve(ctx context.Context, socket string) error {
 		}
 	})
 
-	srv := &http.Server{Handler: s.routes(), BaseContext: func(net.Listener) context.Context { return ctx }}
+	srv := &http.Server{Handler: s.socketHandler(), BaseContext: func(net.Listener) context.Context { return ctx }}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
