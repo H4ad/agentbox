@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,10 +24,19 @@ import (
 // It's below the ephemeral ranges (Linux 32768–60999, macOS 49152–65535):
 // one the kernel handed out with :0 is free again once closed, and a
 // parallel test's outgoing connection could take it before the server binds.
+// handedOut are the ports freePort has given a test: free when it looked,
+// but closed again for the test to listen on, so two tests running in
+// parallel could otherwise be given the same one, and the second to listen
+// finds it taken.
+var handedOut sync.Map
+
 func freePort(t *testing.T) int {
 	t.Helper()
 	for range 100 {
 		port := 20000 + rand.IntN(12000)
+		if _, taken := handedOut.LoadOrStore(port, true); taken {
+			continue
+		}
 		ln, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 		if err == nil {
 			_ = ln.Close()
