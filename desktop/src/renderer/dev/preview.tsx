@@ -16,6 +16,8 @@
 //   ?app=work               the Work page (components/WorkView), of every
 //                           project, from dev/pastAgents.ts; any ?app= has the
 //                           fixture timelines
+//   ?badge=offer            the one-time offer of "Built with AgentBox" on pull
+//                           requests, shown over the page (dismissed it stays off)
 //   ?lang=pt-BR             the app in another language (default: en-US), for
 //                           strings longer than English's
 //   ?folded=1               the rail folded to 56px (default: open)
