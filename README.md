@@ -182,6 +182,12 @@ build of your own needs signing for it: `scripts/mac-sign.sh bin/agentbox`.
 4. Check the **Media** tab for the screenshots, recordings and test reports it kept to show its
    work, and the **Pull requests** tab to read and merge what it built.
 
+No project in mind? On the empty Home, **Try it on a sample project** makes Tally, a tiny to-do
+web app with a few gaps left in on purpose, as a repository in your home folder, and offers three
+starter tasks to launch as agents at once. It needs no GitHub account (its agents commit on their
+branches and don't push), and **Delete sample** in its banner removes its agents, the project and
+the folder.
+
 ## Requirements and limitations
 
 - **Linux on x86_64**, a Mac, or Windows with WSL2 — macOS and Windows are newer and less complete
