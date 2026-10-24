@@ -29,6 +29,7 @@ export interface Project {
   prWatch: string;
   syncBase: boolean;
   fullTestSuite: boolean;
+  pickUpIssues: boolean;
   prWatching: boolean;
   createdAt: string;
   iconVersion: number;
@@ -100,6 +101,7 @@ export interface UpdateProjectRequest {
   prWatch?: string;
   syncBase?: boolean;
   fullTestSuite?: boolean;
+  pickUpIssues?: boolean;
 }
 
 export interface Section {
@@ -375,6 +377,7 @@ export interface ContinueArchivedRequest {
 
 export interface CreateAgentRequest {
   task?: string;
+  issue?: number;
   project: string;
   name?: string;
   title?: string;
@@ -1678,6 +1681,49 @@ export interface ProjectPullRequests {
   mergeMethods?: string[];
   fetchedAt?: string;
   refreshing?: boolean;
+}
+
+export interface Issue {
+  number: number;
+  title: string;
+  url: string;
+  author?: string;
+  authorAvatar?: string;
+  labels?: Label[];
+  comments?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  handed?: IssueHandoff;
+}
+
+export interface IssueHandoff {
+  agent?: string;
+  job?: string;
+  agentTitle?: string;
+  status?: string;
+  retired?: boolean;
+  auto?: boolean;
+  at: string;
+  pullRequest?: IssuePullRequest;
+}
+
+export interface IssuePullRequest {
+  number: number;
+  url: string;
+  state: string;
+}
+
+export interface ProjectIssues {
+  project: string;
+  github?: string;
+  githubAccount?: string;
+  githubError?: GitHubError;
+  noOrigin?: boolean;
+  nonGitHubRemote?: string;
+  issues: Issue[];
+  pickUpIssues: boolean;
+  label: string;
+  fetchedAt?: string;
 }
 
 export interface MergePullRequestRequest {
