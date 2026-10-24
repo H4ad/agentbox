@@ -73,6 +73,7 @@ import { useHostTheme } from "./lib/theme";
 import { markSeen, shouldShowAutomatically } from "./lib/whatsnew";
 import { WorkPage } from "./components/WorkView";
 import { MissionControl } from "./components/MissionControl";
+import { RecapView } from "./components/RecapView";
 import type { WorkFilter } from "./lib/work";
 
 export type View =
@@ -86,6 +87,8 @@ export type View =
   // Everything agents did, live and past, of every project or project's,
   // opened on filter (components/WorkView).
   | { kind: "work"; project?: string; filter?: WorkFilter }
+  // The user's week with AgentBox, opened from Work (components/RecapView).
+  | { kind: "recap" }
   // A past agent (ref), read in its chat.
   | { kind: "pastAgents"; ref: string }
   // Every live agent of every project, live, and their day (components/MissionControl).
@@ -676,6 +679,7 @@ export function App({ initial }: { initial?: View } = {}) {
                 {view.kind === "media" && <AllMediaView onSelect={select} />}
                 {view.kind === "mission" && <MissionControl onSelect={select} />}
                 {view.kind === "work" && <WorkPage project={view.project} filter={view.filter} onSelect={select} />}
+                {view.kind === "recap" && <RecapView onSelect={select} />}
                 {view.kind === "pastAgents" && <PastAgentView agentRef={view.ref} onBack={() => select({ kind: "work" })} onSelect={select} />}
                 {view.kind === "settings" && (
                   <SettingsView onHome={() => select({ kind: "home" })} linked={settingsLink} />

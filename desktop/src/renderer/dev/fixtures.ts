@@ -12,6 +12,7 @@ import { freeTargets } from '../lib/freeResources';
 import { inScope, type MediaScope } from '../lib/mediaPages';
 import { pagePageUrl, pageRequest, pageThumbUrl } from './pages';
 import { pastRequest } from './pastAgents';
+import { recapRequest } from './recap';
 
 export const PROJECT = 'agentbox';
 
@@ -2161,6 +2162,8 @@ export function installDevBridge(): void {
       if (files) return files;
       const past = pastRequest(method, path, body);
       if (past) return past;
+      const recap = recapRequest(method, path);
+      if (recap) return recap;
       const answer = await pullsRequest(method, path);
       if (answer) return answer;
       for (const answer of devRequests) {
@@ -2289,6 +2292,8 @@ export function installDevBridge(): void {
     onNotificationClick: () => () => {},
     copyText: () => {},
     readText: async () => '',
+    copyImage: () => {},
+    saveImage: async () => false,
   };
 }
 
