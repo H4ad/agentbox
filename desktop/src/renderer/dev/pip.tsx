@@ -67,7 +67,7 @@ const agents = (): T.Agent[] => [
 ];
 
 // shot is a scene at a moment as a picture: its markup in an SVG.
-function shot(scene: Scene, t: number): string {
+export function shot(scene: Scene, t: number): string {
   const html = renderToStaticMarkup(
     <div style={{ position: 'relative', width: W, height: H, overflow: 'hidden' }}>
       <SceneAt scene={scene} t={t} />

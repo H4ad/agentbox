@@ -412,6 +412,12 @@ export const api = {
     window.agentbox.pageThumb(pagePath(name, id), key),
 
   fleet: (project: string) => call<T.Fleet>('GET', `/v1/projects/${encodeURIComponent(project)}/fleet`),
+  // Mission control: every live agent's step, day lane, last screenshot and
+  // pull request (components/MissionControl).
+  mission: () => call<T.Mission>('GET', '/v1/mission'),
+  // A still of an agent's display now, width pixels wide; bucket only makes
+  // each refresh a new URL. 204 (an <img> error) when it has no display up.
+  agentFrameUrl: (ref: string, width: number, bucket: number) => window.agentbox.chatImageUrl(`${agent(ref)}/browser/frame?width=${width}&t=${bucket}`),
   // When each of the project's agents last used its desktop (components/pip).
   projectDesktops: (project: string) => call<T.DesktopUse[]>('GET', `/v1/projects/${encodeURIComponent(project)}/desktops`),
   projectCredentials: (project: string) => call<T.ToolCredential[]>('GET', `/v1/projects/${encodeURIComponent(project)}/credentials`),

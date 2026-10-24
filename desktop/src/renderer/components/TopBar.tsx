@@ -79,6 +79,9 @@ export function TopBar({
     case 'group':
       crumbs.push({ label: t('group.crumb') });
       break;
+    case 'mission':
+      crumbs.push({ label: t('mission.title') });
+      break;
     case 'work':
       if (view.project) crumbs.push({ label: projectLabel(view.project, projects.data), view: { kind: 'project', project: view.project } });
       crumbs.push({ label: t('work.title') });

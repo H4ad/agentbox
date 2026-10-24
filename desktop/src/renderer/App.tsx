@@ -72,6 +72,7 @@ import { setupCard } from "./lib/setup";
 import { useHostTheme } from "./lib/theme";
 import { markSeen, shouldShowAutomatically } from "./lib/whatsnew";
 import { WorkPage } from "./components/WorkView";
+import { MissionControl } from "./components/MissionControl";
 import type { WorkFilter } from "./lib/work";
 
 export type View =
@@ -87,6 +88,8 @@ export type View =
   | { kind: "work"; project?: string; filter?: WorkFilter }
   // A past agent (ref), read in its chat.
   | { kind: "pastAgents"; ref: string }
+  // Every live agent of every project, live, and their day (components/MissionControl).
+  | { kind: "mission" }
   // A group of agents given one task, side by side (components/groups).
   | { kind: "group"; id: string };
 
@@ -657,6 +660,7 @@ export function App({ initial }: { initial?: View } = {}) {
                 {view.kind === "jobs" && <JobsView />}
                 {view.kind === "group" && <CompareView id={view.id} onSelect={select} />}
                 {view.kind === "media" && <AllMediaView onSelect={select} />}
+                {view.kind === "mission" && <MissionControl onSelect={select} />}
                 {view.kind === "work" && <WorkPage project={view.project} filter={view.filter} onSelect={select} />}
                 {view.kind === "pastAgents" && <PastAgentView agentRef={view.ref} onBack={() => select({ kind: "work" })} onSelect={select} />}
                 {view.kind === "settings" && (

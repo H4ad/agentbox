@@ -14,6 +14,9 @@
 //   ?app=work               the Work page (components/WorkView), of every
 //                           project, from dev/pastAgents.ts; any ?app= has the
 //                           fixture timelines
+//   ?app=mission            Mission control (components/MissionControl) with
+//                           28 agents of five projects in every state, and
+//                           their day (dev/mission.tsx)
 //   ?lang=pt-BR             the app in another language (default: en-US), for
 //                           strings longer than English's
 //   ?folded=1               the rail folded to 56px (default: open)
@@ -315,6 +318,7 @@ import { ReviewPreview, seedEvidence, seedLeadLines, seedReview, seedV2 } from '
 import { PipFinish, seedPip } from './pip';
 import { seedPick } from './pick';
 import { seedTimelines } from './timeline';
+import { seedMission } from './mission';
 import { setUiV2 } from '../lib/uiV2';
 import { setGroupIdle } from '../lib/groupIdle';
 import { setTourState, tours, welcomeTour } from '../lib/tours';
@@ -593,6 +597,8 @@ if (appView && params.get('v2') === '1') {
     if (file && ref) openFile(ref, file);
   }
 }
+// ?app=mission: its agents and their day, in place of the fixtures' (dev/mission.tsx).
+if (appView === 'mission') seedMission(queryClient);
 // A refetch of a lead's chat or of the skills gets what was seeded, not the
 // bridge's {} for what it doesn't know: the v2 sidebar refetches leads every
 // minute, and a lead with no ref took the page down.
@@ -1476,6 +1482,7 @@ if (phoneMode === 'frame') {
   const initial: View =
     appView === 'home' ? { kind: 'home' }
     : appView === 'work' ? { kind: 'work' }
+    : appView === 'mission' ? { kind: 'mission' }
     : appView === 'settings' ? { kind: 'settings' }
     : appView === 'homeChat' ? { kind: 'homeChat' }
     : appView === 'project' || appView === 'pulls' ? { kind: 'project', project: PROJECT, tab: appView === 'pulls' ? 'pulls' : 'chat' }

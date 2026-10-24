@@ -22,7 +22,7 @@
 // lib/leadFirst.ts's, lib/projectOrder.ts's and lib/sidebarHidden.ts's.
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Briefcase, Check, ChevronRight, CircleArrowUp, Eye, EyeOff, Folder, FolderInput, FolderMinus, FolderPlus, FolderTree, House, Images, ListChecks, ListFilter, LoaderCircle, MoonStar, RefreshCw, Search, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
+import { Briefcase, LayoutGrid, Check, ChevronRight, CircleArrowUp, Eye, EyeOff, Folder, FolderInput, FolderMinus, FolderPlus, FolderTree, House, Images, ListChecks, ListFilter, LoaderCircle, MoonStar, RefreshCw, Search, Settings, ShieldAlert, SquarePen, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type DragEvent, type ReactNode } from 'react';
 import * as A from '../../../shared/api';
 import type * as T from '../../../shared/api';
@@ -571,7 +571,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       />
 
       {/* The foot is one row of icons, each named by its tooltip: Settings,
-          which opens straight away, Past agents, Media and Jobs, the places
+          which opens straight away, Mission control, Work, Media and Jobs, the places
           across every project, the one open highlighted, and the update check.
           Home, the chat and its Status tab, heads the list above; which
           AgentBox this window drives is under Settings → General. */}
@@ -579,6 +579,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
         {(
           [
             { kind: 'settings', icon: Settings, label: t('common.settings'), alert: setup.data && !setup.data.ready },
+            { kind: 'mission', icon: LayoutGrid, label: t('mission.title'), alert: false },
             { kind: 'work', icon: Briefcase, label: t('work.title'), alert: false },
             { kind: 'media', icon: Images, label: t('shell.nav.media'), alert: false },
             { kind: 'jobs', icon: ListChecks, label: t('shell.nav.jobs'), alert: false },

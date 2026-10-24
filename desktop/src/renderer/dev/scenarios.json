@@ -2409,5 +2409,33 @@
       "[data-work-row$='agent-36'] button",
       "[data-review-toggle=details]"
     ]
+  },
+  {
+    "id": "mission-dark",
+    "description": "Mission control: 28 agents of five projects in every state, as cards with their desktops, and their last day as lanes — dark",
+    "query": "app=mission&theme=dark",
+    "width": 1920,
+    "height": 2500
+  },
+  {
+    "id": "mission-light",
+    "description": "Mission control: 28 agents of five projects in every state, as cards with their desktops, and their last day as lanes — light",
+    "query": "app=mission&theme=light",
+    "width": 1920,
+    "height": 2500
+  },
+  {
+    "id": "mission-narrow-dark",
+    "description": "Mission control at 1280px wide, where the grid has fewer columns and the lane labels must not widen the page — dark",
+    "query": "app=mission&theme=dark",
+    "width": 1280,
+    "height": 900
+  },
+  {
+    "id": "mission-v2-light",
+    "description": "Mission control in UI v2, opened from the sidebar's foot — light",
+    "query": "app=mission&v2=1&theme=light",
+    "width": 1600,
+    "height": 1200
   }
 ]

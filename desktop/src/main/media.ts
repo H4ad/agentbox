@@ -40,6 +40,8 @@ const artifactPage = /^\/v1\/projects\/[^/]+\/artifacts\/[A-Za-z0-9_-]+\/page$/;
 // reads from GitHub with the project's account: a private repository's
 // attachments need its token, which never reaches the renderer.
 const pullImage = /^\/v1\/projects\/[^/]+\/pulls\/image$/;
+// A still of an agent's display, for Mission control's cards.
+const agentFrame = /^\/v1\/agents\/[^/]+\/[^/]+\/browser\/frame$/;
 
 export function handleMedia(): void {
   protocol.handle(mediaScheme, (request) => {
@@ -49,8 +51,8 @@ export function handleMedia(): void {
     if (url.host === 'render') return renderResponse(url.pathname.replace(/^\//, ''));
     let path: string;
     if (url.host === 'api') {
-      // A picture sent in a chat or in a pull request, or a Hatch page, and nothing else of the daemon's API.
-      if (pullImage.test(url.pathname)) path = url.pathname + url.search;
+      // A picture sent in a chat or in a pull request, a Hatch page, or an agent's display still, and nothing else of the daemon's API.
+      if (pullImage.test(url.pathname) || agentFrame.test(url.pathname)) path = url.pathname + url.search;
       else if (chatImage.test(url.pathname) || artifactPage.test(url.pathname)) path = url.pathname;
       else return new Response('not found', { status: 404, headers: cors });
     } else {
