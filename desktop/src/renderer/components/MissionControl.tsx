@@ -397,11 +397,11 @@ const Lane = memo(function Lane({ agent, line, since, now, onOpen }: { agent: T.
         </span>
       </span>
       <span className="relative mr-3 h-3.5 flex-1">
-        {placed.map((p) => {
+        {placed.map((p, i) => {
           const kind = kindOf(p.seg.kind);
           return (
             <span
-              key={p.seg.start}
+              key={`${i}:${p.seg.start}`}
               className={cn(
                 'absolute inset-y-0 min-w-[2px] rounded-[2px]',
                 p.seg.status === 'failed' ? 'bg-rose-500' : kindTone[kind],

@@ -168,6 +168,7 @@ function build(now: number) {
 export function seedMission(queryClient: QueryClient): void {
   // The real clock, whose last 24 hours always hold a night.
   const { agents, mission, memory } = build(Date.now());
+  const projects = new Set(fixtures.map((f) => f.project).filter((p) => p !== 'agentbox'));
   const scenes = new Map(fixtures.map((f) => [`${f.project}/${f.name}`, f.scene ?? 'docs']));
   setDesktopStandIn((a) => <Desktop scene={scenes.get(a.ref) ?? 'docs'} t={7} />);
   const json = (v: unknown) => ({ status: 200, body: JSON.stringify(v), contentType: 'application/json' });
@@ -176,6 +177,10 @@ export function seedMission(queryClient: QueryClient): void {
     if (path === '/v1/agents') return json(agents);
     if (path === '/v1/mission') return json(mission);
     if (path === '/v1/usage/memory') return json(memory);
+    // Lists the sidebar and the agents' avatars read of projects the other
+    // fixtures don't have, which the bridge would answer with {}.
+    const project = /^\/v1\/projects\/([^/]+)\/(questions|agent-events|desktops|terminals)/.exec(path);
+    if (project && projects.has(decodeURIComponent(project[1]!))) return json([]);
     return undefined;
   });
   queryClient.setQueryData(['agents'], agents);
