@@ -3920,6 +3920,8 @@ export const enUS = {
   'timeline.empty': 'No steps yet',
   'timeline.failedToLoad': 'Couldn’t read the timeline',
   'timeline.working': 'Still working: the timeline grows as it goes',
+  'mission.row.none': 'No agent running',
+  'mission.row.summary': '{live, plural, one {# live} other {# live}} · {working} working{asking, plural, =0 {} other { · # asking}}',
   'mission.title': 'Mission control',
   'mission.description': 'Every agent of every project, live, and what each did over the last day. Click one to open it.',
   'mission.filters': 'Filter the agents by state',

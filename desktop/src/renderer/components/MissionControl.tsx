@@ -82,7 +82,8 @@ export function MissionControl({ onSelect }: { onSelect: (view: View) => void })
   const rows = useMemo(() => laneRows(agents.data ?? [], mission.data), [agents.data, mission.data]);
   const memoryOf = useMemo(() => new Map((memory.data?.agents ?? []).map((a) => [a.ref, a.memory])), [memory.data]);
   const label = (project: string) => projectLabel(project, projects.data);
-  const open = (ref: string) => onSelect({ kind: 'agent', ref, tab: 'chat' });
+  // As the v2 agent list does: the app opens its chat with its desktop beside it.
+  const open = (ref: string) => onSelect({ kind: 'agent', ref });
   const loading = agents.isPending || mission.isPending;
 
   return (

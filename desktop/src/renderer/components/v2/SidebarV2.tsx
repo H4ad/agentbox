@@ -47,6 +47,7 @@ import { updateHint } from '../../lib/appUpdate';
 import { isNightly, isUpgrade } from '../../lib/nightly';
 import { useAppUpdate } from '../../lib/useAppUpdate';
 import { cn, errorMessage, shortcut, timeAgo } from '../../lib/utils';
+import { missionCards } from '../../lib/mission';
 import { openNewTask, requestComposerFocus } from '../../lib/newTask';
 import { openPanelOn, setPanel } from '../../lib/rightPanel';
 import { describeDelete, dropLine, Logo, moveKeys, NameSection, RenameSection, SectionHeader } from '../Sidebar';
@@ -531,6 +532,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       >
         <NewTaskRow />
         <HomeRow active={view.kind === 'homeChat' || view.kind === 'home'} onClick={() => onSelect({ kind: 'homeChat' })} />
+        <MissionRow active={view.kind === 'mission'} onClick={() => onSelect({ kind: 'mission' })} />
         <FilterBar filters={filters} onFilters={onFilters} projects={projects.data ?? []} rows={rows} />
         {projects.data?.length === 0 && (
           <button className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg border border-dashed border-line-strong px-3 py-3 text-left text-[13px] text-subtle hover:border-line-heavy hover:text-tertiary" onClick={onAddProject}>
@@ -571,7 +573,7 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
       />
 
       {/* The foot is one row of icons, each named by its tooltip: Settings,
-          which opens straight away, Mission control, Work, Media and Jobs, the places
+          which opens straight away, Work, Media and Jobs, the places
           across every project, the one open highlighted, and the update check.
           Home, the chat and its Status tab, heads the list above; which
           AgentBox this window drives is under Settings → General. */}
@@ -579,7 +581,6 @@ export function SidebarV2({ view, onSelect, onAddProject, onNewAgent }: { view: 
         {(
           [
             { kind: 'settings', icon: Settings, label: t('common.settings'), alert: setup.data && !setup.data.ready },
-            { kind: 'mission', icon: LayoutGrid, label: t('mission.title'), alert: false },
             { kind: 'work', icon: Briefcase, label: t('work.title'), alert: false },
             { kind: 'media', icon: Images, label: t('shell.nav.media'), alert: false },
             { kind: 'jobs', icon: ListChecks, label: t('shell.nav.jobs'), alert: false },
@@ -825,6 +826,33 @@ function HomeRow({ active, onClick }: { active: boolean; onClick: () => void }) 
           {chat.data?.last && <span className="ml-auto shrink-0 text-[11px] text-faint">{timeAgo(chat.data.last.at, now)}</span>}
         </span>
         <span className="block truncate text-[11.5px] text-subtle">{line ? (line.mine ? t('v2.sidebar.you', { text: line.text }) : line.text) : t('v2.sidebar.homeHint')}</span>
+      </span>
+    </Lead>
+  );
+}
+
+// MissionRow opens Mission control (components/MissionControl), every
+// project's live agents at once, under Home: what it says is how many of
+// them work and how many need you, from the agents the sidebar already reads.
+function MissionRow({ active, onClick }: { active: boolean; onClick: () => void }) {
+  const t = useT();
+  const agents = useQuery({ queryKey: ['agents'], queryFn: api.agents });
+  const cards = missionCards(agents.data ?? []);
+  const working = cards.filter((c) => c.state === 'working' || c.state === 'testing').length;
+  const asking = cards.filter((c) => c.state === 'asking').length;
+  return (
+    <Lead active={active} onClick={onClick} data={{ 'data-v2-mission': '' }}>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-surface-strong text-secondary">
+        <LayoutGrid className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[13px] font-medium text-title">{t('mission.title')}</span>
+          {asking > 0 && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden />}
+        </span>
+        <span className="block truncate text-[11.5px] text-subtle">
+          {cards.length === 0 ? t('mission.row.none') : t('mission.row.summary', { live: cards.length, working, asking })}
+        </span>
       </span>
     </Lead>
   );

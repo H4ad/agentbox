@@ -3921,6 +3921,8 @@ export const ptBR: Messages = {
   'timeline.empty': 'Nenhum passo ainda',
   'timeline.failedToLoad': 'Não foi possível ler a linha do tempo',
   'timeline.working': 'Ainda trabalhando: a linha do tempo cresce enquanto isso',
+  'mission.row.none': 'Nenhum agente rodando',
+  'mission.row.summary': '{live, plural, one {# ativo} other {# ativos}} · {working} trabalhando{asking, plural, =0 {} other { · # perguntando}}',
   'mission.title': 'Central de missões',
   'mission.description': 'Todos os agentes de todos os projetos, ao vivo, e o que cada um fez no último dia. Clique em um para abri-lo.',
   'mission.filters': 'Filtrar os agentes por estado',
