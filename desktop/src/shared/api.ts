@@ -2109,6 +2109,23 @@ export interface LANPhone {
   scopes: string[];
 }
 
+export interface PhonePush {
+  token?: string;
+  registered: boolean;
+  kinds: string[];
+  quietFrom: number;
+  quietTo: number;
+  timeZone?: string;
+}
+
+export interface PhonePushTest {
+  sent: boolean;
+  error?: string;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}
+
 export interface UpdateLANRequest {
   enabled?: boolean;
   port?: number;
@@ -3338,6 +3355,10 @@ export const DiskFull = "full";
 export const EventLAN = "lan";
 export const EventSnap = "snap";
 export const EventFiles = "files";
+export const PushFinished = "finished";
+export const PushNeedsYou = "needs_you";
+export const PushPRReady = "pr_ready";
+export const PushCIFailed = "ci_failed";
 export const FileModified = "modified";
 export const FileAdded = "added";
 export const FileDeleted = "deleted";
