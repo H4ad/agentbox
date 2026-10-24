@@ -239,6 +239,7 @@ type Server struct {
 	// leadPermissions carries agents' permission requests to their leads'
 	// chats (leadpermissions.go).
 	leadPermissions leadPermissions
+	setups          *setupRuns        // projects' setup runs (projectsetup.go)
 	baseSyncErrs    map[string]string // why each project's last base sync failed, by project, so a remote that stays down is logged once (basesync.go)
 	image           imageWork         // what the daemon is doing to the base image (imagetools.go)
 	imageWaiters    int               // jobs waiting for the base image to be built (imagebuild.go)
@@ -370,6 +371,7 @@ func New(cfg Config) (*Server, error) {
 		outcomes:         map[string]agentOutcome{},
 		outcomesRead:     map[string]bool{},
 		baseSyncErrs:     map[string]string{},
+		setups:           newSetupRuns(),
 		pulls:            newPullsCache(),
 		prWatch:          newPRWatcher(),
 		files:            newFilesCache(),
@@ -555,6 +557,7 @@ func (s *Server) serve(ctx context.Context, socket string) error {
 	loops.Go(func() { s.runSchedules(ctx) })
 	loops.Go(func() { s.reconcilePullRequests(ctx) })
 	loops.Go(func() { s.syncBases(ctx) })
+	loops.Go(func() { s.runSetups(ctx) })
 	// Incus is asked only from here on: nothing before Serve may wait on it.
 	loops.Go(func() { s.watchIncus(ctx) })
 	loops.Go(func() { s.dropOldLimits(ctx) })
@@ -902,6 +905,9 @@ func (s *Server) routes() http.Handler {
 	h("GET /v1/projects/{project}/base", s.getBase)
 	h("POST /v1/projects/{project}/base", s.saveBase)
 	h("DELETE /v1/projects/{project}/base", s.removeBase)
+	h("GET /v1/projects/{project}/setup", s.getSetup)
+	h("PUT /v1/projects/{project}/setup", s.putSetup)
+	h("POST /v1/projects/{project}/setup/rebuild", s.rebuildSetup)
 	h("POST /v1/projects/{project}/base/revert", s.revertBase)
 
 	h("GET /v1/pressure", s.getPressure)

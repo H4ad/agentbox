@@ -217,6 +217,11 @@ export const api = {
   revertBase: (name: string) => call<T.Base>('POST', `${project(name)}/base/revert`),
   removeBase: (name: string) => call<void>('DELETE', `${project(name)}/base`),
   removePreviousBase: (name: string) => call<void>('DELETE', `${project(name)}/base?previous=1`),
+  // The setup command the daemon runs whenever the project's main branch
+  // moves, saving the machine as the base; rebuild runs it again now.
+  projectSetup: (name: string) => call<T.ProjectSetup>('GET', `${project(name)}/setup`),
+  setProjectSetup: (name: string, command: string) => call<T.ProjectSetup>('PUT', `${project(name)}/setup`, { command } satisfies T.SetProjectSetupRequest),
+  rebuildProjectSetup: (name: string) => call<T.ProjectSetup>('POST', `${project(name)}/setup/rebuild`),
 
   agents: () => call<T.Agent[]>('GET', '/v1/agents'),
   // Making or starting an agent in VM mode brings the VM up first, so the

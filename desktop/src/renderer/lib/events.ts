@@ -179,6 +179,10 @@ export function connectEvents(queryClient: QueryClient): void {
         void queryClient.invalidateQueries({ queryKey: ['projects'] });
         // The project's notes change with it: the lead writes them too.
         void queryClient.invalidateQueries({ queryKey: ['notes'] });
+        // Its setup run moved on (projectsetup.go), and with a run that
+        // ended, maybe its base.
+        void queryClient.invalidateQueries({ queryKey: ['setup'] });
+        void queryClient.invalidateQueries({ queryKey: ['base'] });
         // A change with no project named is the list itself: a section made,
         // renamed or deleted, or the projects reordered (D79).
         void queryClient.invalidateQueries({ queryKey: ['sections'] });

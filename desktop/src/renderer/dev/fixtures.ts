@@ -1123,6 +1123,9 @@ export function dropDevAgent(ref: string): void {
 
 const devState: {
   projects: T.Project[];
+  // The ?setup= scenarios' setup command and the base it made (projectSetup.ts).
+  projectSetup?: T.ProjectSetup;
+  base?: T.Base | null;
   media?: T.MediaItem[];
   // The ?notify= scenarios' bell history and all-projects media (notifications.tsx).
   notifications?: T.Notification[];
@@ -2122,6 +2125,8 @@ export function installDevBridge(): void {
       if (method === 'GET' && path === '/v1/settings' && defaultsSettings.claudeCodeUpdate) return { status: 200, body: JSON.stringify(defaultsSettings), contentType: 'application/json' };
       const page = pageRequest(method, path);
       if (page) return page;
+      if (method === 'GET' && devState.projectSetup && path === `/v1/projects/${PROJECT}/setup`) return { status: 200, body: JSON.stringify(devState.projectSetup), contentType: 'application/json' };
+      if (method === 'GET' && devState.base && path === `/v1/projects/${PROJECT}/base`) return { status: 200, body: JSON.stringify(devState.base), contentType: 'application/json' };
       // No project has a saved base: Settings' Repository says so.
       if (method === 'GET' && /^\/v1\/projects\/[^/]+\/base$/.test(path)) return { status: 404, body: JSON.stringify({ error: 'no base' }), contentType: 'application/json' };
       // Files first: a past agent's are under /v1/archived-agents too.
@@ -2282,4 +2287,15 @@ export function richStreamText(which: 'open' | 'tall'): string {
   const fence = '```';
   const rows = Array.from({ length: which === 'tall' ? 40 : 6 }, (_, i) => `<div style="padding:6px 0;border-bottom:1px solid #8884">Row ${i + 1}</div>`);
   return ['Here is the page:', '', `${fence}html preview`, '<!doctype html><html><body><h3>Tall page</h3>', ...rows, ...(which === 'tall' ? ['</body></html>', fence, '', 'And that was all.'] : [])].join('\n');
+}
+
+// setDevSetup is the ?setup= scenarios' project: its setup command's last run,
+// the base new agents start from, and a running run's job and log.
+export function setDevSetup(setup: T.ProjectSetup, base: T.Base | null, job?: T.Job, log?: string): void {
+  devState.projectSetup = setup;
+  devState.base = base;
+  if (job) {
+    devState.job = job;
+    devState.jobLog = log ?? '';
+  }
 }

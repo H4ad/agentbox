@@ -1044,6 +1044,23 @@ func (c *Client) RemoveBase(ctx context.Context, project string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/projects/"+url.PathEscape(project)+"/base", nil, nil)
 }
 
+func (c *Client) ProjectSetup(ctx context.Context, project string) (ProjectSetup, error) {
+	var out ProjectSetup
+	return out, c.do(ctx, http.MethodGet, "/v1/projects/"+url.PathEscape(project)+"/setup", nil, &out)
+}
+
+func (c *Client) SetProjectSetup(ctx context.Context, project, command string) (ProjectSetup, error) {
+	var out ProjectSetup
+	return out, c.do(ctx, http.MethodPut, "/v1/projects/"+url.PathEscape(project)+"/setup", SetProjectSetupRequest{Command: command}, &out)
+}
+
+// RebuildProjectSetup runs the project's setup command again now, whether or
+// not its main branch moved.
+func (c *Client) RebuildProjectSetup(ctx context.Context, project string) (ProjectSetup, error) {
+	var out ProjectSetup
+	return out, c.do(ctx, http.MethodPost, "/v1/projects/"+url.PathEscape(project)+"/setup/rebuild", nil, &out)
+}
+
 // RevertBase puts the base the last save replaced back, and returns it.
 func (c *Client) RevertBase(ctx context.Context, project string) (Base, error) {
 	var out Base

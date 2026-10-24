@@ -1320,6 +1320,23 @@ var migrations = []string{
 	// a credential request for it wakes the lead, which may fulfil it from the
 	// stored value by name (fulfil_credential). Agents' own secrets stay 0.
 	`ALTER TABLE secrets ADD COLUMN lead_managed INTEGER NOT NULL DEFAULT 0`,
+	// A project's setup command, which the daemon runs in a machine of its own
+	// whenever the project's main branch moves, saving the machine as the
+	// project's base (projectsetup.go), and how its last run went. The base it
+	// saved records its own commit and duration on the machine (agent.Base):
+	// this is the attempt, which a failure leaves behind while the base stays.
+	`CREATE TABLE project_setup (
+		project      TEXT PRIMARY KEY REFERENCES projects(name),
+		command      TEXT NOT NULL DEFAULT '',
+		status       TEXT NOT NULL DEFAULT '',
+		run_commit   TEXT NOT NULL DEFAULT '',
+		run_command  TEXT NOT NULL DEFAULT '',
+		started_at   INTEGER NOT NULL DEFAULT 0,
+		finished_at  INTEGER NOT NULL DEFAULT 0,
+		error        TEXT NOT NULL DEFAULT '',
+		log          TEXT NOT NULL DEFAULT '',
+		waiting      TEXT NOT NULL DEFAULT ''
+	)`,
 }
 
 // DefaultMediaRetentionDays is what projects.media_retention_days reads as
@@ -1948,6 +1965,7 @@ func (s *Store) RemoveProject(ctx context.Context, name string) error {
 var projectOwned = []string{
 	// agent_seq has a foreign key to projects: an agent ever made leaves a row.
 	"agent_seq",
+	"project_setup",
 	// Members first: they point at their group.
 	"agent_group_members",
 	"agent_groups",

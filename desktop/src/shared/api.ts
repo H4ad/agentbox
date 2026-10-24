@@ -443,6 +443,8 @@ export interface Base {
   savedAt: string;
   image?: string;
   tools?: string;
+  setupCommit?: string;
+  setupSeconds?: number;
   behind?: BaseBehind;
   previous?: Base;
 }
@@ -469,6 +471,24 @@ export interface BaseToolChange {
 
 export interface SaveBaseRequest {
   agent: string;
+}
+
+export interface ProjectSetup {
+  command: string;
+  branch?: string;
+  head?: string;
+  status?: string;
+  commit?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  error?: string;
+  log?: string;
+  waiting?: string;
+  job?: string;
+}
+
+export interface SetProjectSetupRequest {
+  command: string;
 }
 
 export interface StopAgentsRequest {

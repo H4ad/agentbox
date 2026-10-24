@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +47,11 @@ type Base struct {
 	// again — including bases saved before this was read. A refresh that
 	// caught the machine up (CatchUp) moved them on before it was saved.
 	Built image.Installed
+	// SetupCommit and SetupTook are set on a base the project's setup command
+	// made (CreateSetupMachine): the commit of the main branch it ran at, and
+	// how long the run took. Empty for a base saved from an agent.
+	SetupCommit string
+	SetupTook   time.Duration
 }
 
 // SnapshotRef is what new agents are copied from.
@@ -74,6 +80,10 @@ func (m *Manager) baseAt(ctx context.Context, name string) (base Base, ok bool, 
 	}
 	base = Base{Instance: name, SavedFrom: config["user.agentbox.saved-from"], Built: image.InstalledFrom(config)}
 	base.SavedAt, _ = time.Parse(time.RFC3339, config["user.agentbox.saved-at"])
+	base.SetupCommit = config[setupCommitKey]
+	if secs, err := strconv.Atoi(config[setupSecondsKey]); err == nil {
+		base.SetupTook = time.Duration(secs) * time.Second
+	}
 	return base, true, nil
 }
 
@@ -335,4 +345,75 @@ rm -rf .config/agentbox/env .config/agentbox/secrets.env .codex/auth.json .claud
   .config/agentbox/browser .local/state/agentbox .android .local/share/android-sdk
 truncate -s0 /etc/machine-id
 rm -f /var/lib/dbus/machine-id`, shellQuote("/home/"+user))
+}
+
+// SetupName is the agent a project's setup command runs in: a machine made
+// from the plain base image at the main branch's tip, saved as the project's
+// base when the command succeeds, and destroyed either way. It is reserved,
+// like the base's own names, so no agent of the user's can be taken for it.
+const SetupName = "base-setup"
+
+// The keys a base made by the setup command carries on its instance. They are
+// set after its snapshot is taken, so agents copied from it don't carry them
+// into a base saved from one of them later.
+const (
+	setupCommitKey  = "user.agentbox.setup-commit"
+	setupSecondsKey = "user.agentbox.setup-seconds"
+)
+
+// CreateSetupMachine makes the machine the project's setup command runs in,
+// at commit on branch. It starts from the plain base image, never from the
+// project's base: the command is what sets the project up, so a base it makes
+// holds what the command installs and nothing a failed run, or an agent,
+// left on an earlier one. node_modules and the package managers' caches don't
+// start empty all the same: they are kept outside machines (nodemodules.go,
+// pkgcache.go).
+func (m *Manager) CreateSetupMachine(ctx context.Context, project, branch, commit string) (state.Agent, error) {
+	// Left by a run the daemon didn't see to its end.
+	if a, err := m.Store.Agent(ctx, project, SetupName); err == nil {
+		if err := m.DestroySetupMachine(ctx, a); err != nil {
+			return state.Agent{}, err
+		}
+	}
+	_ = m.Store.DeleteArchivedAgent(ctx, project, SetupName)
+	return m.Create(ctx, project, CreateOptions{
+		Name:    SetupName,
+		Title:   "Project setup",
+		Branch:  SetupName,
+		AI:      "none",
+		From:    branch,
+		StartAt: commit,
+		CopyEnv: true,
+		Clean:   true,
+		setup:   true,
+	})
+}
+
+// SaveSetupBase saves the setup machine as the project's base, and records
+// on it the commit the command ran at and how long the run took.
+func (m *Manager) SaveSetupBase(ctx context.Context, a state.Agent, commit string, took time.Duration) (Base, error) {
+	base, err := m.SaveBase(ctx, a)
+	if err != nil {
+		return Base{}, err
+	}
+	took = took.Round(time.Second)
+	if err := m.Incus.SetConfig(ctx, base.Instance,
+		setupCommitKey+"="+commit,
+		setupSecondsKey+"="+strconv.Itoa(int(took/time.Second))); err != nil {
+		return base, err
+	}
+	base.SetupCommit, base.SetupTook = commit, took
+	return base, nil
+}
+
+// DestroySetupMachine destroys the setup machine with its branch, and forgets
+// it: it was never an agent anybody worked with, so it leaves no past agent.
+func (m *Manager) DestroySetupMachine(ctx context.Context, a state.Agent) error {
+	if err := m.Destroy(ctx, a, DestroyOptions{Force: true, DeleteBranch: true, DeleteMedia: true}); err != nil {
+		return err
+	}
+	if err := m.Store.DeleteArchivedAgent(context.WithoutCancel(ctx), a.Project, a.Name); err != nil && !errors.Is(err, state.ErrNotFound) {
+		return err
+	}
+	return nil
 }

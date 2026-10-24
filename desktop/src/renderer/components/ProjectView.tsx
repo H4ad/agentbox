@@ -17,6 +17,7 @@ import { ConnectorsTab } from './ConnectorsTab';
 import { leadAgentFrom, ProjectChatPanel } from './ProjectChatPanel';
 import { WorkList } from './WorkView';
 import { ProjectBasePanel } from './ProjectBasePanel';
+import { ProjectSetupPanel } from './ProjectSetupPanel';
 import { ProjectMediaPanel } from './ProjectMediaPanel';
 import { ScopedMediaPages } from './pages/MediaPages';
 import { ProjectMemoryPanel } from './ProjectMemoryPanel';
@@ -409,6 +410,7 @@ export function ProjectSettingsBody({ project, section, onSection, onSelect, onO
               {project.envFiles.length > 0 ? project.envFiles.join(', ') : t('project.view.envNone')}
             </Row>
           </Card>
+          <ProjectSetupPanel project={project} />
           <ProjectBasePanel project={project} onOpenAgent={(ref) => onSelect({ kind: 'agent', ref })} />
         </div>
       )}

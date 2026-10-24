@@ -79,4 +79,7 @@ func (s *Server) syncBase(ctx context.Context, p state.Project) {
 	case synced.Moved:
 		s.logf("%s: fast-forwarded %s to %s", p.Name, synced.Branch, up)
 	}
+	if synced.Moved {
+		s.kickSetups() // a project with a setup command sets up the new tip
+	}
 }

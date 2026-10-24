@@ -213,7 +213,7 @@ type ForkOptions struct {
 // machine, and a new branch starting where the snapshot's branch was, with the
 // snapshot's uncommitted and untracked files still uncommitted.
 func (m *Manager) Fork(ctx context.Context, src state.Agent, opts ForkOptions) (state.Agent, error) {
-	if err := validateName(opts.Name); err != nil {
+	if err := validateName(opts.Name, false); err != nil {
 		return state.Agent{}, err
 	}
 	title, err := CleanTitle(opts.Title)

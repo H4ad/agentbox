@@ -385,6 +385,9 @@ type CreateOptions struct {
 	// and branch it was queued with. The daemon starts every one of them as
 	// it starts (leftoverqueue.go).
 	Queued bool
+	// setup makes the machine a project's setup command runs in, under the
+	// name SetupName, which nothing else may take (CreateSetupMachine).
+	setup bool
 }
 
 // Create builds an agent from the project's saved base, or from the base image.
@@ -402,7 +405,7 @@ func (m *Manager) Create(ctx context.Context, project string, opts CreateOptions
 	if err := m.CheckConnectorLimit(ctx, project, opts.Connectors); err != nil {
 		return state.Agent{}, err
 	}
-	if err := validateName(opts.Name); err != nil {
+	if err := validateName(opts.Name, opts.setup); err != nil {
 		return state.Agent{}, err
 	}
 	if err := CheckBranchSlug(opts.Branch); err != nil {
@@ -524,8 +527,8 @@ func CleanTitle(title string) (string, error) {
 	return title, nil
 }
 
-func validateName(name string) error {
-	if name == "" {
+func validateName(name string, setup bool) error {
+	if name == "" || setup && name == SetupName {
 		return nil
 	}
 	if err := naming.Validate("agent", name, MaxNameLen); err != nil {
@@ -533,6 +536,9 @@ func validateName(name string) error {
 	}
 	if name == baseName || name == previousBaseName {
 		return fmt.Errorf("%q is reserved for the project's saved base", name)
+	}
+	if name == SetupName {
+		return fmt.Errorf("%q is reserved for the machine the project's setup command runs in", name)
 	}
 	if name == state.LeadName {
 		return fmt.Errorf("%q is reserved for the project's chat", state.LeadName)

@@ -812,7 +812,8 @@ func (s *Server) getBase(w http.ResponseWriter, r *http.Request) error {
 
 func apiBase(base agent.Base) api.Base {
 	return api.Base{Snapshot: base.SnapshotRef(), SavedFrom: base.SavedFrom, SavedAt: base.SavedAt,
-		Image: base.Built.Version, Tools: base.Built.ToolsVersion}
+		Image: base.Built.Version, Tools: base.Built.ToolsVersion,
+		SetupCommit: base.SetupCommit, SetupSeconds: int(base.SetupTook / time.Second)}
 }
 
 func apiBaseBehind(b image.Behind) *api.BaseBehind {
@@ -966,8 +967,10 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) error {
 	}
 	out := make([]api.Agent, 0, len(statuses))
 	for _, st := range statuses {
-		if st.IsLead() {
-			continue // the project's chat, shown as the project, not as an agent
+		if st.IsLead() || st.Name == agent.SetupName {
+			// The project's chat, shown as the project, not as an agent; and
+			// the machine its setup command runs in, shown in its Settings.
+			continue
 		}
 		out = append(out, s.agentInfo(st))
 	}

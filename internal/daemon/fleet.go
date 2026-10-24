@@ -47,7 +47,7 @@ func (s *Server) fleet(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	// The project's chat is not one of its agents, so it never appears here.
-	statuses = slices.DeleteFunc(statuses, func(st agent.Status) bool { return st.IsLead() })
+	statuses = slices.DeleteFunc(statuses, func(st agent.Status) bool { return st.IsLead() || st.Name == agent.SetupName })
 
 	account, _ := s.githubAccountFor(p)
 	out := api.Fleet{Project: project, GitHubAccount: account, Agents: []api.FleetAgent{}, Creating: []api.Job{}}

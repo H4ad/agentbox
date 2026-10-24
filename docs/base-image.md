@@ -106,6 +106,25 @@ shows what they hold and empties them; so does `agentbox package-cache [on|off] 
   different disks: still much faster than downloading.
 - Turned off, agents go back to caches of their own when their shells next start.
 
+## A project's setup command
+
+A project can have a command that sets it up, such as `pnpm install && make deps`, under the
+project's **Settings → Repository → Setup command**. Whenever the project's main branch moves,
+AgentBox makes a machine from the base image at the branch's tip, runs the command in its worktree,
+and saves that machine as the project's base. New agents then start with the project already
+installed.
+
+- Runs go one at a time, across every project. A run waits to start while the VM is short of
+  memory, behind the agents' own heavy commands.
+- A run that fails leaves the last good base in place, and Settings shows why, with the command's
+  last lines. AgentBox doesn't try the same commit again until the branch moves, the command
+  changes, or you click **Run now**.
+- Settings shows which commit the base was built from, when, and how long the run took.
+- Each run starts from the plain base image, not from the base before it, so the base holds what the
+  command installs. `node_modules` and the package caches carry over all the same: they are kept
+  outside the machines.
+- Leaving the command empty turns setup off. The base it last saved stays.
+
 ## Personalising it
 
 `agentbox-base/ready` still has the placeholder `agent` user in it when it's built.

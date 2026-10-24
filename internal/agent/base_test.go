@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"agentbox/internal/agent"
 	"agentbox/internal/image"
@@ -268,4 +269,64 @@ exit 0`, imageConfig(image.Version, false, pinnedTools(""))))
 		t.Errorf("Built = %+v", base.Built)
 	}
 	noCall(t, calls(), "config unset ab-organic-base-next user.agentbox.")
+}
+
+// "base-setup" is the machine the project's setup command runs in, so an
+// agent may not take it either.
+func TestSetupNameIsReserved(t *testing.T) {
+	f := setup(t, fakeIncus(t, "exit 0"))
+	if _, err := f.m.Create(context.Background(), "hello-stack", agent.CreateOptions{AI: "none", Name: agent.SetupName}); err == nil ||
+		!strings.Contains(err.Error(), "reserved") {
+		t.Errorf("Create(Name: %s) = %v, want a reserved-name error", agent.SetupName, err)
+	}
+}
+
+// A base the setup command made records the commit it ran at and how long
+// it took, on the base's instance once its snapshot is taken: agents copied
+// from the snapshot don't carry them into a base saved from one of them.
+func TestSaveSetupBaseRecordsItsCommit(t *testing.T) {
+	inc, calls := loggingIncus(t, `case "$1" in
+  list) echo '[{"name":"ab-hello-stack-base-next","status":"Running","state":{"network":{"eth0":{"addresses":[{"family":"inet","address":"10.0.0.9"}]}}}}]' ;;
+  query) echo '{"config":{},"expanded_config":{},"devices":{}}' ;;
+esac
+exit 0`)
+	f := setup(t, inc)
+	a := state.Agent{Project: "hello-stack", Name: agent.SetupName, Instance: "ab-hello-stack-base-setup"}
+
+	base, err := f.m.SaveSetupBase(context.Background(), a, "abc123", 95*time.Second+400*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base.SetupCommit != "abc123" || base.SetupTook != 95*time.Second {
+		t.Errorf("SaveSetupBase() = %+v", base)
+	}
+	all := calls()
+	snapshot, set := -1, -1
+	for i, c := range all {
+		if strings.HasPrefix(c, "snapshot create ab-hello-stack-base-next ready") {
+			snapshot = i
+		}
+		if strings.Contains(c, "ab-hello-stack-base user.agentbox.setup-commit=abc123 user.agentbox.setup-seconds=95") {
+			set = i
+		}
+	}
+	if snapshot < 0 || set < snapshot {
+		t.Errorf("the setup keys weren't set on the base after its snapshot; incus ran:\n  %s", strings.Join(all, "\n  "))
+	}
+}
+
+func TestProjectBaseReadsItsSetup(t *testing.T) {
+	inc, _ := loggingIncus(t, `case "$1" in
+  query)
+    case "$2" in
+      */snapshots) echo "[\"$2/ready\"]" ;;
+      *) echo '{"config":{"user.agentbox.saved-from":"hello-stack/base-setup","user.agentbox.saved-at":"2026-10-24T10:00:00Z","user.agentbox.setup-commit":"abc123","user.agentbox.setup-seconds":"95"}}' ;;
+    esac ;;
+esac
+exit 0`)
+	f := setup(t, inc)
+	base, ok, err := f.m.ProjectBase(context.Background(), "hello-stack")
+	if err != nil || !ok || base.SetupCommit != "abc123" || base.SetupTook != 95*time.Second {
+		t.Errorf("ProjectBase() = %+v, %v, %v", base, ok, err)
+	}
 }

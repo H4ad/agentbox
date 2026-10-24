@@ -1158,6 +1158,11 @@ type Base struct {
 	// recorded them; either is empty for a base from before it was recorded.
 	Image string `json:"image,omitempty"`
 	Tools string `json:"tools,omitempty"`
+	// SetupCommit is the commit of the main branch the project's setup
+	// command ran at to make this base, and SetupSeconds how long the run
+	// took; both are empty for a base saved from an agent.
+	SetupCommit  string `json:"setupCommit,omitempty"`
+	SetupSeconds int    `json:"setupSeconds,omitempty"`
 	// Behind is what the base image AgentBox makes now has that this base
 	// doesn't; nil when it has everything, or on Previous. Refreshing the base
 	// with CatchUp brings it up to date.
@@ -1196,6 +1201,37 @@ type BaseToolChange struct {
 	Name string `json:"name"`
 	From string `json:"from,omitempty"`
 	To   string `json:"to,omitempty"`
+}
+
+// ProjectSetup is GET /v1/projects/{project}/setup: the project's setup
+// command, which the daemon runs in a machine of its own whenever the
+// project's main branch moves, saving it as the project's base, and how its
+// last run went. A failed run leaves the base before it in place.
+type ProjectSetup struct {
+	Command string `json:"command"`
+	// Branch is the main branch whose moves start a run, and Head its tip
+	// now; both empty when the repository has no main branch to follow.
+	Branch string `json:"branch,omitempty"`
+	Head   string `json:"head,omitempty"`
+	// Status is "" before the first run, then waiting, building, ready or
+	// failed (state.Setup*). Commit is the commit the last run was for.
+	Status     string     `json:"status,omitempty"`
+	Commit     string     `json:"commit,omitempty"`
+	StartedAt  *time.Time `json:"startedAt,omitempty"`
+	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	// Error is why a failed run failed, and Log the command's last lines.
+	Error string `json:"error,omitempty"`
+	Log   string `json:"log,omitempty"`
+	// Waiting is why a waiting run hasn't started, in words.
+	Waiting string `json:"waiting,omitempty"`
+	// Job is the running run's job, whose log is the run's as it goes.
+	Job string `json:"job,omitempty"`
+}
+
+// SetProjectSetupRequest is PUT /v1/projects/{project}/setup. An empty
+// command turns setup off; the base it saved stays.
+type SetProjectSetupRequest struct {
+	Command string `json:"command"`
 }
 
 type SaveBaseRequest struct {

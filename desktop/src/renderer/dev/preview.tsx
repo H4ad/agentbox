@@ -246,6 +246,9 @@
 //                           open at a tab or a section of its Settings tab
 //                           (?page=tokens, ?page=general…); with ?open=agent-99,
 //                           that agent's page (?page=secrets, ?page=machine…)
+//   &setup=building         with ?page=settings, Repository's setup command:
+//                           none set, or its last run waiting, building,
+//                           ready or failed beside the base (dev/projectSetup.ts)
 //   &secrets=1              with ?page=secrets, the project's Secrets with two
 //                           secrets in it, one managed by the lead
 //   ?phone=list|chat|lead|frame
@@ -299,6 +302,7 @@ import { api } from '../lib/api';
 import type { AgentPlaceName, ProjectPlaceName } from '../lib/tabs';
 import { Markdown } from '../components/chat/Markdown';
 import { agent12Chat, asleepChat, buildFixtures, claudeLimits, dropDevAgent, compactionThread, thinkingThread, richChat, richStreamText, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedSignedOut, seedNightly, seedMeterUsage, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, seedMacVZ, setNotifications } from './fixtures';
+import { seedProjectSetup } from './projectSetup';
 import { publishOne, seedPages } from './pages';
 import { seedPastAgents } from './pastAgents';
 import { openPanelOn, pickTarget, setPanel, setPanelOpen, setView, type PanelView } from '../lib/rightPanel';
@@ -636,6 +640,8 @@ if (params.get('nightly') === '1') seedNightly(queryClient);
 if (chvSize) seedLinuxVM(queryClient, chvSize);
 const macVZ = params.get('mac'); // 'brew' | 'driver' | 'manual' | 'nodriver' | 'ready' | null
 if (macVZ) seedMacVZ(queryClient, macVZ);
+const setupScenario = params.get('setup'); // 'none' | 'waiting' | 'building' | 'ready' | 'failed' | null
+if (setupScenario) seedProjectSetup(setupScenario);
 // ?page= shows whole pages, and their sections ask for what no other
 // scenario seeds: no limits read yet, and no secrets or
 // connectors.
