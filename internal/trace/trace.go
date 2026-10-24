@@ -149,10 +149,12 @@ func (r *Recorder) write() {
 				break more
 			}
 		}
-		r.spans.write(spans)
+		// Stalls first: whoever has read a span can then read its stall
+		// (Settings → Diagnostics reads the two files one after the other).
 		if len(stalls) > 0 {
 			r.stalls.write(stalls)
 		}
+		r.spans.write(spans)
 	}
 }
 
