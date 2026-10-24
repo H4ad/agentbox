@@ -2344,6 +2344,8 @@ export interface ChatScheduledRun {
   run: string;
   title: string;
   trigger: string;
+  event?: string;
+  eventUrl?: string;
   dueAt?: string;
   late?: boolean;
   missed?: number;
@@ -2357,6 +2359,8 @@ export interface Schedule {
   title: string;
   task: string;
   kind: string;
+  event?: string;
+  eventLabel?: string;
   at?: string;
   everyMinutes?: number;
   cron?: string;
@@ -2382,6 +2386,8 @@ export interface ScheduleRun {
   schedule: string;
   title?: string;
   trigger: string;
+  event?: string;
+  eventUrl?: string;
   dueAt?: string;
   ranAt: string;
   late?: boolean;
@@ -2400,6 +2406,8 @@ export interface ScheduleRequest {
   in?: string;
   every?: string;
   cron?: string;
+  on?: string;
+  label?: string;
   timezone?: string;
   target?: string;
   session?: string;
