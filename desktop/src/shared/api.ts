@@ -25,6 +25,7 @@ export interface Project {
   position: number;
   nesting: boolean;
   agentPRs: boolean;
+  sample?: boolean;
   prWatch: string;
   syncBase: boolean;
   fullTestSuite: boolean;
@@ -63,6 +64,17 @@ export interface AddProjectRequest {
   copyToLinux?: boolean;
   create?: boolean;
   commitFiles?: boolean;
+}
+
+export interface Sample {
+  project: string;
+  tasks: SampleTask[];
+}
+
+export interface SampleTask {
+  title: string;
+  branch: string;
+  task: string;
 }
 
 export interface UpdateProjectRequest {

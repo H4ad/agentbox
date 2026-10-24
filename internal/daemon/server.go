@@ -793,6 +793,10 @@ func (s *Server) routes() http.Handler {
 
 	h("GET /v1/projects", s.listProjects)
 	h("POST /v1/projects", s.addProject)
+	// The sample project a new user can try AgentBox on (internal/sample).
+	h("GET /v1/sample", s.getSample)
+	h("POST /v1/sample", s.createSample)
+	h("DELETE /v1/sample/{project}", s.deleteSample)
 	// When each project last did anything, for the sidebar's order: polled.
 	h("GET /v1/project-activity", s.projectActivity)
 	// How the sidebar is organised (D79): the sections, and one layout that

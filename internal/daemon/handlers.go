@@ -22,6 +22,7 @@ import (
 	"agentbox/internal/hostos"
 	"agentbox/internal/image"
 	"agentbox/internal/notes"
+	"agentbox/internal/sample"
 	"agentbox/internal/state"
 )
 
@@ -51,6 +52,7 @@ func (s *Server) projectInfo(ctx context.Context, p state.Project) api.Project {
 	if v, err := s.store.ProjectIconVersion(ctx, p.Name); err == nil {
 		info.IconVersion = v
 	}
+	info.Sample = sample.Is(p.Root)
 	if repo, err := gitrepo.Open(p.Root); err == nil {
 		info.Branch = repo.CurrentBranch()
 		if files, err := repo.EnvFiles(); err == nil && files != nil {
@@ -538,20 +540,26 @@ func (s *Server) checkGitHubAccount(account string) error {
 }
 
 func (s *Server) removeProject(w http.ResponseWriter, r *http.Request) error {
-	// The project's chat goes with it; only its agents block removal.
-	project := r.PathValue("project")
+	if err := s.removeProjectNow(r.Context(), r.PathValue("project")); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// removeProjectNow removes a project and its chat; only its agents block
+// removal. Deleting the sample ends here too, once its agents are gone.
+func (s *Server) removeProjectNow(ctx context.Context, project string) error {
 	s.chat.Stop(agent.LeadRef(project), "the project was removed")
 	s.chat.Forget(agent.LeadRef(project))
-	if err := s.manager(s.cfg.Log).DestroyLead(r.Context(), project); err != nil {
+	if err := s.manager(s.cfg.Log).DestroyLead(ctx, project); err != nil {
 		return err
 	}
 	defer s.stopLeadAPI(project)
-	name := r.PathValue("project")
-	if err := s.store.RemoveProject(r.Context(), name); err != nil {
+	if err := s.store.RemoveProject(ctx, project); err != nil {
 		return err
 	}
-	s.events.publish(api.EventProject, api.ProjectChange{Name: name, Removed: true})
-	w.WriteHeader(http.StatusNoContent)
+	s.events.publish(api.EventProject, api.ProjectChange{Name: project, Removed: true})
 	return nil
 }
 

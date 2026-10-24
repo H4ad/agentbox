@@ -2409,5 +2409,19 @@
       "[data-work-row$='agent-36'] button",
       "[data-review-toggle=details]"
     ]
+  },
+  {
+    "id": "sample-offer-dark",
+    "description": "Home with no projects: Welcome with the offer to try a sample project (components/SampleProject.tsx) — dark, v2",
+    "query": "app=home&v2=1&sample=empty&theme=dark",
+    "width": 1440,
+    "height": 900
+  },
+  {
+    "id": "sample-agents-dark",
+    "description": "The sample project's chat with its three starter agents running, under the banner that points at the lead and the desktops — dark, v2",
+    "query": "app=project&v2=1&sample=agents&theme=dark",
+    "width": 1440,
+    "height": 900
   }
 ]

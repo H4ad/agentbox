@@ -37,6 +37,7 @@ import { AgentMentionsProvider } from './pip/Mentions';
 import { PanelButton } from './v2/PanelButton';
 import { openPanelOn, setPanel } from '../lib/rightPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { SampleBanner } from './SampleProject';
 
 // The project's notes: what every agent of it is told, over and above the brief
 // AgentBox writes. The user writes them here, and the project's chat adds what
@@ -255,6 +256,7 @@ export function ProjectView({ name, tab: opensAt, onSelect, onNewAgent }: { name
       )}
 
       <TabsContent value="chat" className="flex flex-col">
+        {project.sample && <SampleBanner project={project} agents={mine} onSelect={onSelect} />}
         <div className={cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', !v2 && 'mx-2 mb-2 rounded-2xl border border-line md:mx-6 md:mb-6')}>
           {v2 ? (
             // UI v2's lead links its agents' names in the chat (components/pip);

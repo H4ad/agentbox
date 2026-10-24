@@ -121,6 +121,9 @@ type Project struct {
 	// open their own pull request when they finish. Off by default: a push
 	// publishes, with the user's GitHub token.
 	AgentPRs bool `json:"agentPRs"`
+	// Sample is whether this is the sample project the app offers new users
+	// (internal/sample), which DELETE /v1/sample/{project} removes whole.
+	Sample bool `json:"sample,omitempty"`
 	// PRWatch is whether the daemon watches this project's agents' pull
 	// requests: "" to follow Settings.PRWatch, "on" or "off" to override it.
 	PRWatch string `json:"prWatch"`
@@ -372,6 +375,27 @@ type AddProjectRequest struct {
 	// another repository is refused.
 	Create      bool `json:"create,omitempty"`
 	CommitFiles bool `json:"commitFiles,omitempty"`
+}
+
+// Sample is the sample project a new user can try AgentBox on (internal/sample):
+// GET /v1/sample offers it, POST /v1/sample makes it, a small repository in
+// the home folder added as a project, and DELETE /v1/sample/{project} takes it
+// away again, agents, branches and folder.
+type Sample struct {
+	// Project is the sample project's name: the one POST made, or for GET the
+	// newest sample there is, and empty when there's none.
+	Project string `json:"project"`
+	// Tasks are the starter tasks the app offers to launch on it, each as an
+	// agent of its own.
+	Tasks []SampleTask `json:"tasks"`
+}
+
+// SampleTask is one of Sample.Tasks: a CreateAgentRequest's Title, Branch and
+// Task.
+type SampleTask struct {
+	Title  string `json:"title"`
+	Branch string `json:"branch"`
+	Task   string `json:"task"`
 }
 
 // HomeAddProjectRequest is the Home chat adding a project: a folder on this

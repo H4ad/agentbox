@@ -981,6 +981,23 @@ func (c *Client) RemoveProject(ctx context.Context, name string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/projects/"+url.PathEscape(name), nil, nil)
 }
 
+// Sample returns the sample project's starter tasks, and its name if there is one.
+func (c *Client) Sample(ctx context.Context) (Sample, error) {
+	var out Sample
+	return out, c.do(ctx, http.MethodGet, "/v1/sample", nil, &out)
+}
+
+// CreateSample makes the sample project and adds it.
+func (c *Client) CreateSample(ctx context.Context) (Sample, error) {
+	var out Sample
+	return out, c.do(ctx, http.MethodPost, "/v1/sample", nil, &out)
+}
+
+// DeleteSample removes a sample project with its agents and its folder.
+func (c *Client) DeleteSample(ctx context.Context, project string) error {
+	return c.do(ctx, http.MethodDelete, "/v1/sample/"+url.PathEscape(project), nil, nil)
+}
+
 // ProjectActivity returns when each project that has a chat item last did
 // anything, and when the user last wrote to it.
 func (c *Client) ProjectActivity(ctx context.Context) ([]ProjectActivity, error) {

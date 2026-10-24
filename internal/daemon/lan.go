@@ -844,7 +844,7 @@ var lanNever = []struct {
 	{"terminals", regexp.MustCompile(`^\S+ .*/terminal(/|$)`)},
 	{"the browser and Android views", regexp.MustCompile(`^\S+ /v1/agents/[^/]+/[^/]+/(browser|android)(/|$)`)},
 	{"pairing and the phone, remote and tunnel settings", regexp.MustCompile(`^\S+ /v1/(lan|remote)(/|$)`)},
-	{"creating or removing projects and agents", regexp.MustCompile(`^(POST /v1/projects|DELETE /v1/projects/[^/]+|POST /v1/projects/[^/]+/retire|POST /v1/agents|DELETE /v1/agents/[^/]+/[^/]+|POST /v1/agents/[^/]+/[^/]+/(fork|recreate))/?$`)},
+	{"creating or removing projects and agents", regexp.MustCompile(`^(POST /v1/projects|DELETE /v1/projects/[^/]+|POST /v1/sample|DELETE /v1/sample/[^/]+|POST /v1/projects/[^/]+/retire|POST /v1/agents|DELETE /v1/agents/[^/]+/[^/]+|POST /v1/agents/[^/]+/[^/]+/(fork|recreate))/?$`)},
 	{"job logs", regexp.MustCompile(`^\S+ /v1/jobs/[^/]+/log(/|$)`)},
 }
 

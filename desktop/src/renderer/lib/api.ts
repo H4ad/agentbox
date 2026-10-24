@@ -182,6 +182,11 @@ export const api = {
   addProject: (req: T.AddProjectRequest) => call<T.Project>('POST', '/v1/projects', req),
   updateProject: (name: string, req: T.UpdateProjectRequest) => call<T.Project>('PATCH', project(name), req),
   removeProject: (name: string) => call<void>('DELETE', project(name)),
+  // The sample project a new user can try AgentBox on: its starter tasks,
+  // making it, and deleting it with its agents and folder.
+  sample: () => call<T.Sample>('GET', '/v1/sample'),
+  createSample: () => call<T.Sample>('POST', '/v1/sample'),
+  deleteSample: (name: string) => call<void>('DELETE', `/v1/sample/${encodeURIComponent(name)}`),
   // When the user last wrote to each project and when anything last happened
   // in its chats: v2's sidebar sorts and settles projects by them.
   projectActivity: () => call<T.ProjectActivity[]>('GET', '/v1/project-activity'),

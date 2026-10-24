@@ -191,6 +191,11 @@
 //                           windows, where the shell's columns turn into
 //                           drawers. "Ready to review" has agents waiting
 //                           (dev/review.tsx), for its modal and the PR's
+//   &sample=empty|agents    with ?app=home or ?app=project, the sample project
+//                           (components/SampleProject.tsx): no projects yet,
+//                           with Home's offer to make it, which makes it and
+//                           launches its starter tasks against a fake of
+//                           the daemon; or the sample with its three agents
 //   &pins=a,b               with &v2=1, those projects pinned, in that order
 //   &stale=1                with &v2=1 and &idle=1, idle-1 has unseen questions from destroyed agents
 //   &hidden=a,b             with &v2=1, those projects hidden from the sidebar
@@ -631,6 +636,8 @@ if (imageUpdate) seedImageUpdate(queryClient);
 if (settingsPage || appView) seedSettings(queryClient);
 if (params.get('signedout') === '1') seedSignedOut(queryClient);
 if (params.get('drag')) dragBridge(queryClient, params.get('drag') === 'slow' ? 1_500 : 300);
+const sampleMode = params.get('sample');
+if (sampleMode) sampleBridge(queryClient, sampleMode === 'agents');
 if (params.get('enforce') === '1') { seedDefaults(queryClient); queryClient.setQueryData<T.Settings>(['settings'], (s) => s && { ...s, enforceAgentDefaults: true }); }
 if (params.get('nightly') === '1') seedNightly(queryClient);
 if (chvSize) seedLinuxVM(queryClient, chvSize);
@@ -1400,6 +1407,75 @@ function dragBridge(queryClient: QueryClient, delay: number): void {
   }, 700);
 }
 
+// sampleBridge is the sample project against a fake of the daemon
+// (&sample=): no projects until Home's offer makes it, agents its starter
+// tasks add, running at once, and its Delete taking both away again. With
+// withAgents, the sample and its three agents are there from the start.
+function sampleBridge(queryClient: QueryClient, withAgents: boolean): void {
+  type Bridge = { request: (method: string, path: string, body?: unknown) => Promise<unknown> };
+  const bridge = (window as unknown as { agentbox: Bridge }).agentbox;
+  const inner = bridge.request;
+  const name = 'agentbox-sample';
+  const tasks: T.SampleTask[] = [
+    { title: 'Add dark mode', branch: 'add-dark-mode', task: 'Add a dark mode to Tally.' },
+    { title: 'Add tests', branch: 'add-tests', task: 'Tally has no tests.' },
+    { title: 'Fix the items-left count', branch: 'fix-items-left', task: 'The items-left count is wrong.' },
+  ];
+  const base = fixtures.projects.find((p) => p.name === PROJECT)!;
+  const sample: T.Project = { ...base, name, displayName: '', root: '/home/you/agentbox-sample', sample: true, agentPRs: false, envFiles: [], section: '', position: 0 };
+  const chats = ['running', 'running', 'running'] as const;
+  const agentFor = (task: T.SampleTask, i: number): T.Agent => ({
+    ...fixtures.agents[0],
+    project: name,
+    name: `agent-0${i + 1}`,
+    ref: `${name}/agent-0${i + 1}`,
+    title: task.title,
+    branch: `agentbox/${task.branch}`,
+    state: 'running',
+    chat: chats[i % 3],
+  });
+  let projects: T.Project[] = withAgents ? [sample] : [];
+  let agents: T.Agent[] = withAgents ? tasks.map(agentFor) : [];
+  const answer = (v: unknown, status = 200) => ({ status, body: v === undefined ? '' : JSON.stringify(v), contentType: 'application/json' });
+  const refresh = () => {
+    queryClient.setQueryData(['projects'], projects);
+    queryClient.setQueryData(['agents'], agents);
+  };
+  bridge.request = async (method, path, body) => {
+    if (method === 'GET' && path === '/v1/projects') return answer(projects);
+    if (method === 'GET' && path === '/v1/agents') return answer(agents);
+    if (method === 'GET' && path === '/v1/sample') return answer({ project: projects.length ? name : '', tasks });
+    if (method === 'GET' && path === `/v1/projects/${name}/lead`) return answer({ project: name, ref: `${name}/lead`, started: true, chat: 'idle' });
+    // Its lead's chat, ready, with nothing said yet.
+    if (method === 'GET' && path.startsWith(`/v1/projects/${name}/chat?`)) {
+      return answer({ agent: `${name}/lead`, seq: 0, session: { state: 'ready', tool: 'claude', options: [], commands: [] }, items: [] } satisfies T.ChatThread);
+    }
+    if (method === 'GET' && path === `/v1/projects/${name}/fleet`) return answer({ project: name, agents: [], creating: [], idle: 0 });
+    if (method === 'GET' && /^\/v1\/projects\/agentbox-sample\/(agent-events|questions|pulls)/.test(path)) return answer([]);
+    if (method === 'POST' && path === '/v1/sample') {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      projects = [sample];
+      refresh();
+      return answer({ project: name, tasks }, 201);
+    }
+    if (method === 'POST' && path === '/v1/agents') {
+      const req = body as T.CreateAgentRequest;
+      const i = tasks.findIndex((t) => t.branch === req.branch);
+      agents = [...agents, agentFor(tasks[i], agents.length)];
+      return answer({ id: `job-${agents.length}`, kind: 'create', status: 'running' });
+    }
+    if (method === 'DELETE' && path === `/v1/sample/${name}`) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      projects = [];
+      agents = [];
+      refresh();
+      return answer(undefined, 204);
+    }
+    return inner(method, path, body);
+  };
+  refresh();
+}
+
 // Home on a Linux machine that runs agents itself, and the Settings its
 // suggestion opens.
 function LinuxHomePreview() {
@@ -1478,6 +1554,7 @@ if (phoneMode === 'frame') {
     : appView === 'work' ? { kind: 'work' }
     : appView === 'settings' ? { kind: 'settings' }
     : appView === 'homeChat' ? { kind: 'homeChat' }
+    : appView === 'project' && sampleMode ? { kind: 'project', project: 'agentbox-sample' }
     : appView === 'project' || appView === 'pulls' ? { kind: 'project', project: PROJECT, tab: appView === 'pulls' ? 'pulls' : 'chat' }
     : { kind: 'agent', ref: `${PROJECT}/${appView}` };
   createRoot(document.getElementById('root')!).render(

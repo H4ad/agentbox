@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tally</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1>Tally</h1>
+      <p class="lede">Things to do, and how many are left.</p>
+      <form id="add">
+        <input id="text" name="text" placeholder="What needs doing?" autocomplete="off" required />
+        <button type="submit">Add</button>
+      </form>
+      <ul id="list"></ul>
+      <footer>
+        <span id="left"></span>
+        <button id="clear" type="button" class="link">Clear done</button>
+      </footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

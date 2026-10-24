@@ -8,6 +8,7 @@ import { formatList, formatNumber, useT } from '../lib/i18n';
 import { summarizeStatus, type StatusTone } from '../lib/agentStatus';
 import { cn, humanBytes, humanRate, shortRate, stallPressure, timeAgo } from '../lib/utils';
 import { AllAgentsPanel } from './AllAgentsPanel';
+import { SampleOffer } from './SampleProject';
 import { WorkList } from './WorkView';
 import { JobStatusBadge } from './state';
 import { Badge } from './ui/badge';
@@ -45,7 +46,7 @@ export function HomeView({
   const setup = useQuery({ queryKey: ['setup'], queryFn: api.setup, refetchInterval: 15_000 });
 
   if (projects.data?.length === 0) {
-    return <Welcome onAddProject={onAddProject} onSetup={() => openSettingsSection('setup')} setupReady={setup.data?.ready} />;
+    return <Welcome onSelect={onSelect} onAddProject={onAddProject} onSetup={() => openSettingsSection('setup')} setupReady={setup.data?.ready} />;
   }
 
   const all = agents.data ?? [];
@@ -280,7 +281,7 @@ function Stat({ label, value, detail, fraction, note }: { label: string; value: 
   );
 }
 
-function Welcome({ onAddProject, onSetup, setupReady }: { onAddProject: () => void; onSetup: () => void; setupReady?: boolean }) {
+function Welcome({ onSelect, onAddProject, onSetup, setupReady }: { onSelect: (view: View) => void; onAddProject: () => void; onSetup: () => void; setupReady?: boolean }) {
   const t = useT();
   return (
     <div className="h-full overflow-y-auto">
@@ -304,6 +305,7 @@ function Welcome({ onAddProject, onSetup, setupReady }: { onAddProject: () => vo
               {setupReady === false ? t('shell.home.finishSetup') : t('shell.home.checkSetup')}
             </Button>
           </div>
+          <SampleOffer onSelect={onSelect} setupReady={setupReady} />
         </div>
         <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 md:mt-14 lg:grid-cols-4">
           <Feature icon={SquareTerminal} title={t('shell.home.featTerminal')}>
