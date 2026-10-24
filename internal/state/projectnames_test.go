@@ -172,13 +172,16 @@ func TestAvatarIconMigrationDropsCachedAvatars(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The migration under test is the avatar cleanup; later ones are not run
-	// until Open, so find it rather than assume it is the last.
-	before := slices.IndexFunc(migrations, func(m string) bool {
-		return strings.HasPrefix(m, "UPDATE project_icons SET detected = NULL")
-	})
+	// The migration under test is the one dropping the cached avatars; later
+	// ones run when the store opens.
+	before := -1
+	for i, m := range migrations {
+		if strings.HasPrefix(m, "UPDATE project_icons SET detected = NULL") {
+			before = i
+		}
+	}
 	if before < 0 {
-		t.Fatal("avatar cleanup migration not found")
+		t.Fatal("avatar migration not found")
 	}
 	for i, m := range migrations[:before] {
 		if _, err := db.ExecContext(ctx, m); err != nil {
