@@ -19,6 +19,8 @@
 //   ?app=mission            Mission control (components/MissionControl) with
 //                           28 agents of five projects in every state, and
 //                           their day (dev/mission.tsx)
+//   ?badge=offer            the one-time offer of "Built with AgentBox" on pull
+//                           requests, shown over the page (dismissed it stays off)
 //   ?lang=pt-BR             the app in another language (default: en-US), for
 //                           strings longer than English's
 //   ?folded=1               the rail folded to 56px (default: open)
