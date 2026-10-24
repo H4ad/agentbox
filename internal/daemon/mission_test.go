@@ -3,6 +3,9 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,5 +135,61 @@ func TestAgentFrameWithoutADisplay(t *testing.T) {
 	}
 	if _, err := d.client.AgentFrame(ctx, a.Ref(), 10); err == nil {
 		t.Error("a 10px frame was taken")
+	}
+}
+
+// frameIncus is fakeIncus whose exec is the capture: a frame, or exit 3 (no
+// display) once $FRAME_DIR/nodisplay exists, each logged to $FRAME_DIR/execs.
+const frameIncus = `case "$1" in
+  exec)
+    echo exec >> "$FRAME_DIR/execs"
+    if [ -e "$FRAME_DIR/nodisplay" ]; then exit 3; fi
+    printf 'JPEG' ;;
+  *)
+` + fakeIncus + `
+  ;;
+esac
+exit 0
+`
+
+// A ready agent's frame is captured once for every caller within frameFresh;
+// with no display it answers 204, not an error.
+func TestAgentFrame(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	d := startTestDaemon(t, t.TempDir(), frameIncus, testConfig{env: map[string]string{"FRAME_DIR": dir}})
+	ctx := context.Background()
+	if _, err := d.client.AddProject(ctx, api.AddProjectRequest{Path: d.fixtureRepo(t, "hello-stack")}); err != nil {
+		t.Fatal(err)
+	}
+	a := state.Agent{
+		Project: "hello-stack", Name: "agent-09", Instance: "ab-hello-stack-agent-09", AI: "claude", Branch: "agentbox/agent-09",
+		Worktree: "/gone/agent-09", Status: state.AgentReady, CreatedAt: time.Now(), Interface: state.InterfaceChat,
+	}
+	if err := d.srv.store.AddAgent(ctx, a); err != nil {
+		t.Fatal(err)
+	}
+	execs := func() int {
+		b, _ := os.ReadFile(filepath.Join(dir, "execs"))
+		return strings.Count(string(b), "exec")
+	}
+	for range 2 {
+		jpeg, err := d.client.AgentFrame(ctx, a.Ref(), 320)
+		if err != nil || string(jpeg) != "JPEG" {
+			t.Fatalf("frame: %q, %v", jpeg, err)
+		}
+	}
+	if n := execs(); n != 1 {
+		t.Errorf("%d captures for two frames within frameFresh", n)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "nodisplay"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if jpeg, err := d.client.AgentFrame(ctx, a.Ref(), 480); err != nil || len(jpeg) != 0 {
+		t.Fatalf("frame with no display: %q, %v", jpeg, err)
+	}
+	if n := execs(); n != 2 {
+		t.Errorf("another width took %d captures in all, want 2", n)
 	}
 }
