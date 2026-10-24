@@ -1367,6 +1367,18 @@ var migrations = []string{
 		seen_at  INTEGER NOT NULL,
 		PRIMARY KEY (schedule, key)
 	)`,
+	// A paired phone's push notifications (phonepush.go): its Expo push
+	// token, what it wants pushed, and its quiet hours, in minutes after
+	// midnight in its own time zone. Gone with the phone.
+	`CREATE TABLE phone_push (
+		phone_id   TEXT PRIMARY KEY REFERENCES phones(id) ON DELETE CASCADE,
+		token      TEXT NOT NULL,
+		kinds      TEXT NOT NULL,
+		quiet_from INTEGER NOT NULL DEFAULT 0,
+		quiet_to   INTEGER NOT NULL DEFAULT 0,
+		time_zone  TEXT NOT NULL DEFAULT '',
+		updated_at INTEGER NOT NULL
+	)`,
 	// A project's setup command, which the daemon runs in a machine of its own
 	// whenever the project's main branch moves, saving the machine as the
 	// project's base (projectsetup.go), and how its last run went. The base it

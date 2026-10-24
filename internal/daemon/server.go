@@ -253,6 +253,7 @@ type Server struct {
 	lan             *lanState         // phones chatting from the local network or a tunnel (lan.go)
 	share           shareState        // virtiofsd's open files, from the VM's supervisor (share.go)
 	health          healthStats       // what the next health event counts (healthevent.go)
+	phonePush       phonePushState    // push notifications to the phones' app (phonepush.go)
 	// connectorsGiven is whether each connector was last given to agents,
 	// by scope and name, so only a change to that rewrites their MCP
 	// servers (connectors.go).
