@@ -1947,6 +1947,7 @@ export interface ReviewItem {
   ref: string;
   title?: string;
   branch?: string;
+  baseRef?: string;
   ai?: string;
   summary?: string;
   changes?: AgentChanges;

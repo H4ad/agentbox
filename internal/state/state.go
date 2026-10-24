@@ -1341,6 +1341,14 @@ var migrations = []string{
 		pr_state   TEXT NOT NULL DEFAULT '',
 		PRIMARY KEY (project, repo, number)
 	)`,
+	// Detected icons no longer fall back to the GitHub owner's avatar
+	// (projecticon): drop the ones already kept, so those projects show their
+	// first letter instead. detected_at 0 makes the next read look again, which
+	// still finds an icon the repository has; updated_at moves so the app's
+	// cache doesn't keep the old image. A chosen icon is untouched.
+	`UPDATE project_icons SET detected = NULL, detected_mime = '', detected_from = '', detected_at = 0,
+		updated_at = max(updated_at + 1, CAST(strftime('%s','now') AS INTEGER) * 1000)
+		WHERE detected_from LIKE 'github.com/%'`,
 	// A project's setup command, which the daemon runs in a machine of its own
 	// whenever the project's main branch moves, saving the machine as the
 	// project's base (projectsetup.go), and how its last run went. The base it
