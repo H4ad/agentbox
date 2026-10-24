@@ -101,6 +101,8 @@ type Server struct {
 	timeline sync.Map
 	// tails are the agents' terminal tails last read (terminaltail.go).
 	tails tailCache
+	// missions are Mission control's timelines and frames (mission.go).
+	missions missionCache
 	// picks are the element pickers showing, one per agent (browser.go).
 	picks elementPicks
 	// imageCache is the image cache agents' Docker shares (imagecache.go),
@@ -795,6 +797,7 @@ func (s *Server) routes() http.Handler {
 	h("POST /v1/projects", s.addProject)
 	// When each project last did anything, for the sidebar's order: polled.
 	h("GET /v1/project-activity", s.projectActivity)
+	h("GET /v1/mission", s.mission)
 	// How the sidebar is organised (D79): the sections, and one layout that
 	// carries a whole new order rather than a move to infer the rest from.
 	h("GET /v1/sections", s.listSections)
@@ -983,6 +986,7 @@ func (s *Server) routes() http.Handler {
 		h("POST /v1/agents/{project}/{agent}/browser/"+action, s.browser(action, s.agentFromPath))
 	}
 	h("GET /v1/agents/{project}/{agent}/browser/view", s.browserView)
+	h("GET /v1/agents/{project}/{agent}/browser/frame", s.agentFrame)
 	h("POST /v1/agents/{project}/{agent}/browser/pick", s.pickElement)
 	h("POST /v1/agents/{project}/{agent}/browser/pick/cancel", s.cancelPick)
 	h("GET /v1/agents/{project}/{agent}/android", s.android("status", s.agentFromPath, "user"))

@@ -1050,6 +1050,39 @@ export interface TimelinePage {
   item: string;
 }
 
+export interface Mission {
+  since: string;
+  now: string;
+  agents: MissionAgent[];
+}
+
+export interface MissionAgent {
+  ref: string;
+  task?: string;
+  taskAt?: string;
+  step?: MissionStep;
+  working?: boolean;
+  lane: MissionSegment[];
+  frame?: MediaItem;
+  pr?: PullRequest;
+}
+
+export interface MissionStep {
+  kind: string;
+  title: string;
+  start: string;
+  end: string;
+  status?: string;
+}
+
+export interface MissionSegment {
+  kind: string;
+  start: string;
+  end: string;
+  steps: number;
+  status?: string;
+}
+
 export interface AddMediaRequest {
   path: string;
   kind?: string;

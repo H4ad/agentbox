@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"agentbox/internal/desktop"
+	"agentbox/internal/incus"
 	"agentbox/internal/state"
 )
 
@@ -289,6 +290,28 @@ ffmpeg -loglevel error -f x11grab -i :99 -frames:v 1 -y ` + tmp
 	defer func() { _, _ = m.Incus.Exec(context.WithoutCancel(ctx), a.Instance, "rm", "-f", tmp) }()
 	err := m.Incus.PullFile(ctx, a.Instance, tmp, file)
 	return err
+}
+
+// ErrNoDisplay is DisplayFrame's error for a machine whose display isn't running.
+var ErrNoDisplay = errors.New("the display isn't running")
+
+// DisplayFrame is a JPEG of what a's display shows now, width pixels wide:
+// a still for Mission control's card, kept nowhere. It is one ffmpeg frame,
+// written to its stdout rather than to a file to copy out.
+func (m *Manager) DisplayFrame(ctx context.Context, a state.Agent, width int) ([]byte, error) {
+	script := fmt.Sprintf(`[ -e /tmp/.X11-unix/X99 ] || exit 3
+exec ffmpeg -loglevel error -f x11grab -i :99 -frames:v 1 -vf scale=%d:-2 -q:v 7 -f mjpeg -`, width)
+	var stdout, stderr bytes.Buffer
+	if err := m.Incus.UserExec(ctx, a.Instance, m.User.Name, script, nil, &stdout, &stderr); err != nil {
+		if code, ok := incus.ExitCode(err); ok && code == 3 {
+			return nil, ErrNoDisplay
+		}
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("capturing the display: %s", msg)
+		}
+		return nil, fmt.Errorf("capturing the display: %w", err)
+	}
+	return stdout.Bytes(), nil
 }
 
 // withPage runs fn with a DevTools protocol connection to one of the browser's pages.
