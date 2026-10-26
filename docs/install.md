@@ -1,15 +1,80 @@
 # Installing AgentBox
 
-The [README](../README.md#install) has the downloads. This page has the rest: AgentBox's VM on
-Linux, moving an installation from before the VM, and macOS and Windows.
+AgentBox is a desktop app with the `agentbox` command-line tool inside. On Linux, one command
+checks your computer and installs it:
+
+```bash
+curl -fsSL https://downloads.agentbox.linting.dev/install.sh | sh
+```
+
+Then open **AgentBox**. Its **Setup** does the rest the first time it runs: it makes AgentBox's VM,
+builds the machine your agents are copied from, and logs you in to Claude Code, Codex or OpenCode.
+
+On a Mac or Windows, download the app from the
+[downloads page](https://downloads.agentbox.linting.dev/index.html) instead
+(see [macOS and Windows](#macos-and-windows-alpha)).
+
+## What the install script does
+
+Before it downloads anything, it checks that this computer can run AgentBox, and lists everything
+that's missing at once, in plain words:
+
+| Check | Needs | If it's missing |
+|---|---|---|
+| Processor | x86_64 (Linux on ARM isn't supported yet) | It stops. |
+| Virtualization | `/dev/kvm`, for AgentBox's VM | No virtualization: it stops, and says to turn on Intel VT-x or AMD-V in the firmware's settings, or nested virtualization in a VM. A `/dev/kvm` you can't open yet, or KVM's module not loaded, is fine: Setup fixes both (see [below](#kvm)). |
+| Memory | 8 GB | It stops. |
+| Disk | 30 GB free in your home folder, where the VM's disk goes | It stops. |
+| FUSE | `/dev/fuse` and libfuse2, only for the AppImage | It stops, and names the package to install. |
+
+Then it downloads the latest release, checks it against the release's `SHA256SUMS`, and installs
+the package that fits your distribution:
+
+- **Debian and Ubuntu**: the `.deb`, with `apt-get` (asks for your password, through `sudo`).
+- **Arch** and its derivatives: the `.pacman`, with `pacman` (asks for your password, through `sudo`).
+- **Anything else**, Fedora included: the AppImage, in `~/.local/bin/AgentBox.AppImage`, with an
+  entry in your applications menu. No password.
+
+It runs only once it has downloaded completely: a connection cut half-way runs nothing.
+
+| Option | What |
+|---|---|
+| `--check` | Only the checks: says what it would install, downloads nothing |
+| `--appimage` | The AppImage, whatever your distribution |
+| `AGENTBOX_CHANNEL=nightly` | The newest nightly instead of the newest release |
+
+Options go after `sh -s --`:
+
+```bash
+curl -fsSL https://downloads.agentbox.linting.dev/install.sh | sh -s -- --check
+```
+
+To read the script before running it, download it first:
+
+```bash
+curl -fsSLO https://downloads.agentbox.linting.dev/install.sh
+less install.sh
+sh install.sh
+```
+
+### By hand
+
+Every release's files are on the [downloads page](https://downloads.agentbox.linting.dev/index.html):
+
+| File | What |
+|---|---|
+| `AgentBox-<version>-x86_64.AppImage` | Any distribution: `chmod +x` it and run it. Needs FUSE: `fuse2` (Arch), `fuse-libs` (Fedora), `libfuse2` (Debian 12, Ubuntu 22.04) or `libfuse2t64` (Ubuntu 24.04) |
+| `AgentBox-<version>-amd64.deb` | Debian and Ubuntu: `sudo apt install ./AgentBox-<version>-amd64.deb` |
+| `AgentBox-<version>-x64.pacman` | Arch: `sudo pacman -U AgentBox-<version>-x64.pacman` |
+| `SHA256SUMS` | Checksums: `sha256sum -c --ignore-missing SHA256SUMS` |
 
 ## AgentBox's VM, on Linux
 
 On Linux, AgentBox runs in a VM of its own: the daemon, Incus and every agent in one
 [Cloud Hypervisor](https://www.cloudhypervisor.org) VM, with the CPUs and memory cap you give it
 rather than all of your computer's, so heavy agent work can't freeze your desktop. Nothing is
-installed on your system and no password is asked. It needs `/dev/kvm` (your user in the `kvm`
-group) and an `ssh` client. Setup makes it, at the size you pick; from the command line it's
+installed on your system and no password is asked. It needs `/dev/kvm` (see [KVM](#kvm) below
+if your user can't open it yet) and an `ssh` client. Setup makes it, at the size you pick; from the command line it's
 `agentbox vm init` (`--cpus`, `--memory-cap`), which fetches Cloud Hypervisor, passt, virtiofsd and
 Debian's cloud image into `~/.local/share/agentbox/vm` and sets the VM up (about a minute). Every
 other `agentbox` command runs in the VM, and until it's made says to run `agentbox vm init`.
@@ -49,10 +114,31 @@ stays as it was: the agents' old machines stay there, stopped, until you remove 
 `agentbox vm migrate --remove-old` (or the same place in Settings), which removes only AgentBox's
 own. Until you remove them, `agentbox vm delete --yes` goes back to running on your system as before.
 
+## KVM
+
+AgentBox's VM needs `/dev/kvm`. Arch and Fedora give it to every user. Debian and Ubuntu give it
+only to the `kvm` group, which counts from your next login, so a new install there can't open it
+yet. When Setup finds that, it shows **Give access to KVM**: one password prompt, and the VM can be
+made straight away, with no need to log out. From a terminal, the same is:
+
+```bash
+sudo agentbox host kvm
+```
+
+It gives your user `/dev/kvm` now (an access-control entry on the device, which counts for the
+programs you're already running) and adds you to the `kvm` group for your later logins. On a
+system with no `kvm` group, it adds a udev rule instead that gives `/dev/kvm` to whoever is using
+the computer's screen. When there's no `/dev/kvm` at all but the processor can virtualize, it loads
+KVM's module, now and at every start. It's safe to run again.
+
+If the processor shows no virtualization at all, it's off in the firmware's settings (Intel VT-x or
+AMD-V, often under CPU or Advanced), or, in a virtual machine, nested virtualization is off. Only
+you can turn that on; Setup says so.
+
 ## macOS and Windows (alpha)
 
 AgentBox also runs on a **Mac**, in a Linux VM it makes for you with [Lima](https://lima-vm.io)
-(`brew install lima` first), and on **Windows**, in a WSL2 distro it sets up the same way: the
+(Setup downloads Lima when the Mac has none; a Lima you installed is used first), and on **Windows**, in a WSL2 distro it sets up the same way: the
 daemon, Incus and every agent are the Linux ones, and the app and `agentbox` command on your machine
 just talk to them there. Both are newer than the Linux build and ship unsigned for now — on a Mac,
 right-click AgentBox in Applications and choose **Open** the first time; on Windows, the installer
@@ -69,7 +155,8 @@ the VM**), as does `agentbox vm krunkit`; by hand, before setting AgentBox up:
 brew tap slp/krun && brew trust slp/krun && brew install krunkit
 ```
 
-Lima's krunkit driver comes with Homebrew's Lima from 2.0 (`brew upgrade lima`). Without krunkit,
+Lima's krunkit driver comes with Homebrew's Lima from 2.0 (`brew upgrade lima`), and with the Lima
+that Setup downloads. Without krunkit,
 the VM is made with Apple's Virtualization framework: no GPU, and it keeps whatever memory it has
 used until it stops. A VM keeps the kind it was made with: to switch an existing one, Settings →
 **GPU for agents** offers to install krunkit and remake the VM, or `agentbox vm krunkit --remake

@@ -468,6 +468,15 @@ func newInitCmd() *cobra.Command {
   agentbox auth claude          a Claude Code login for your agents`)
 				return nil
 			}
+			if runtime.GOOS == "darwin" {
+				p, err := paths.Default()
+				if err != nil {
+					return err
+				}
+				if _, err := EnsureLima(cmd.Context(), p, cmd.ErrOrStderr()); err != nil {
+					return err
+				}
+			}
 			vm, err := New()
 			if err != nil {
 				return err
@@ -551,12 +560,15 @@ own disk and stay, but push what you want to keep first.`,
 			if vm == nil {
 				return err
 			}
-			if vm.CHV != nil {
-				if vm.Limactl, err = FindLimactl(); err != nil {
+			if vm.CHV != nil || vm.Limactl == "" {
+				// Lima first, AgentBox's own when the Mac has none.
+				p, perr := paths.Default()
+				if perr != nil {
+					return perr
+				}
+				if vm.Limactl, err = EnsureLima(cmd.Context(), p, cmd.ErrOrStderr()); err != nil {
 					return err
 				}
-			} else if vm.Limactl == "" {
-				return err
 			}
 			return vm.InstallKrunkit(cmd.Context())
 		},
@@ -693,7 +705,9 @@ func newStatusCmd() *cobra.Command {
 			} else if !st.Exists {
 				st.Problem = ErrNotCreated.Error()
 			}
-			if err == nil && st.VMType != krunkitVMType {
+			// Without Lima, the one init downloads has krunkit's driver:
+			// Setup can still offer krunkit first.
+			if (err == nil || errors.Is(err, errNoLima)) && st.VMType != krunkitVMType {
 				st.Krunkit = vm.krunkitCheck(cmd.Context())
 			}
 			if st.Exists {

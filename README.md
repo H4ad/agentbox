@@ -112,15 +112,25 @@ still alpha, and Codex cloud needs no computer of yours at all.
 
 ## Install
 
-AgentBox runs on **Linux, x86_64**, with **macOS and Windows in alpha**. Download the latest release
-from [downloads.agentbox.linting.dev](https://downloads.agentbox.linting.dev/index.html):
+AgentBox runs on **Linux, x86_64**, with **macOS and Windows in alpha**. On Linux, one command
+checks your computer (virtualization, 8 GB of memory, 30 GB of disk, FUSE for the AppImage), says
+plainly what's missing before it downloads anything, and installs the latest release, checked
+against its `SHA256SUMS`: the `.deb` on Debian and Ubuntu, the `.pacman` on Arch, and the AppImage
+anywhere else.
+
+```bash
+curl -fsSL https://downloads.agentbox.linting.dev/install.sh | sh
+```
+
+`sh -s -- --check` after the pipe only checks. To install by hand instead (or on a Mac or Windows),
+download from [downloads.agentbox.linting.dev](https://downloads.agentbox.linting.dev/index.html):
 
 | File | What |
 |---|---|
 | `AgentBox-<version>-x86_64.AppImage` | The desktop app, with the `agentbox` command-line tool inside: runs on any distribution |
 | `AgentBox-<version>-amd64.deb` | The desktop app, for Debian and Ubuntu |
 | `AgentBox-<version>-x64.pacman` | The desktop app, for Arch and its derivatives |
-| `AgentBox-<version>-mac-arm64.dmg`, `-mac-x64.dmg` | macOS (alpha), in a Linux VM made with [Lima](https://lima-vm.io): `brew install lima` first |
+| `AgentBox-<version>-mac-arm64.dmg`, `-mac-x64.dmg` | macOS (alpha), in a Linux VM made with [Lima](https://lima-vm.io), which Setup downloads if you have none |
 | `AgentBox-<version>-x64-setup.exe`, `-x64-portable.exe` | Windows (alpha), in a WSL2 distro |
 | `SHA256SUMS` | Checksums: `sha256sum -c SHA256SUMS` |
 
@@ -138,7 +148,8 @@ and Windows builds are unsigned for now: on a Mac, right-click AgentBox in Appli
 The app's **Setup** walks you through the rest the first time it runs. On Linux, AgentBox runs in a
 [Cloud Hypervisor](https://www.cloudhypervisor.org) VM of its own, with the CPUs and memory cap you
 give it, so heavy agent work can't freeze your desktop; nothing is installed on your system and no
-password is asked. [docs/install.md](docs/install.md) has the details: how the VM shares memory
+password is asked. If your user can't open `/dev/kvm` yet, Setup offers **Give access to KVM**, with one
+password prompt and no new login. [docs/install.md](docs/install.md) has the details: the install script, how the VM shares memory
 between agents, moving an installation from before the VM, and the Mac's krunkit VM with a GPU
 for agents.
 
