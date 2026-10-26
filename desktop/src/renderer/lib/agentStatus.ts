@@ -13,6 +13,7 @@ export type StatusTone = 'urgent' | 'error' | 'warning' | 'live' | 'muted';
 
 export function chatLabel(agent: T.Agent): { text: string; tone: StatusTone } {
   // Being made comes before anything its chat says: nothing can need you yet.
+  if (agent.state === 'initializing' && agent.waitingForImage) return { text: t('agent.status.waitingForImage'), tone: 'live' };
   // Its whole machine paused for memory, or waiting for the memory to boot
   // (Settings → Experimental): before anything its chat says, which waits too.
   const machine = machineHold(agent);

@@ -78,6 +78,10 @@ type Config struct {
 	// TraceDir is where the span and stall files go (diagnostics.go): next
 	// to state.db for the real daemon, empty for none (tests).
 	TraceDir string
+	// FetchImage starts the first base image's download (or build) as the
+	// daemon starts, when there is none, instead of when Setup's button is
+	// pressed or an agent needs it: true in AgentBox's VM.
+	FetchImage bool
 	// CrashOutput sends the Go runtime's fatal tracebacks to the crashes
 	// folder (crashes.go), for the next daemon to report: process-wide, so
 	// only for the real daemon.
@@ -251,11 +255,18 @@ type Server struct {
 	baseSyncErrs    map[string]string // why each project's last base sync failed, by project, so a remote that stays down is logged once (basesync.go)
 	image           imageWork         // what the daemon is doing to the base image (imagetools.go)
 	imageWaiters    int               // jobs waiting for the base image to be built (imagebuild.go)
+	agentsOnImage   map[string]bool   // agents, by ref, being made once the base image is ready (imagebuild.go)
 	remote          *remote.Connector // the connection to a hub, when this machine is an environment
 	lan             *lanState         // phones chatting from the local network or a tunnel (lan.go)
-	share           shareState        // virtiofsd's open files, from the VM's supervisor (share.go)
-	health          healthStats       // what the next health event counts (healthevent.go)
-	phonePush       phonePushState    // push notifications to the phones' app (phonepush.go)
+	// firstImage is how fetchFirstImage checks the user mapping and starts
+	// the build: image.CheckHost and startImageBuild, unless a test says.
+	firstImage struct {
+		checkHost func(image.User) error
+		start     func(context.Context) (api.Job, error)
+	}
+	share     shareState     // virtiofsd's open files, from the VM's supervisor (share.go)
+	health    healthStats    // what the next health event counts (healthevent.go)
+	phonePush phonePushState // push notifications to the phones' app (phonepush.go)
 	// connectorsGiven is whether each connector was last given to agents,
 	// by scope and name, so only a change to that rewrites their MCP
 	// servers (connectors.go).
@@ -595,6 +606,11 @@ func (s *Server) serve(ctx context.Context, socket string) error {
 	go s.updateBaseTools(ctx)
 	// And past them, to the newest Claude Code, when you asked for that.
 	loops.Go(func() { s.watchToolUpdates(ctx) })
+	// A new installation's first base image is fetched at once, while you
+	// finish Setup and talk to your projects' chats (imagebuild.go).
+	if s.cfg.FetchImage {
+		loops.Go(func() { s.fetchFirstImage(ctx) })
+	}
 	// Media made on the VM's own disk goes to the host's share, where the app
 	// can open it; it is served from where it was until it has moved.
 	loops.Go(func() {

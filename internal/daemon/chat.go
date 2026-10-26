@@ -52,6 +52,7 @@ func (s *Server) agentInfo(st agent.Status) api.Agent {
 		// in every client until the create job is done, or as waiting for
 		// the memory to boot its machine.
 		info.Memory = s.machineHold(info.Ref)
+		info.WaitingForImage = s.waitingOnImage(info.Ref)
 		return info
 	}
 	info.Chat = s.chat.State(info.Ref)

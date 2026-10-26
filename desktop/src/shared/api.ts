@@ -282,6 +282,7 @@ export interface Agent {
   outcomeUntil?: string;
   changesRequested?: string;
   state: string;
+  waitingForImage?: boolean;
   memory?: MemoryHold;
   reclaimed?: string;
   ip: string;
@@ -769,6 +770,7 @@ export interface AgentChange {
   ip?: string;
   removed?: boolean;
   memory?: MemoryHold;
+  waitingForImage?: boolean;
   reclaimed?: string;
 }
 
@@ -1227,6 +1229,7 @@ export interface ImageStatus {
   build: string;
   job?: string;
   step?: string;
+  progress?: string;
   error?: string;
   waiting: number;
 }
@@ -1825,6 +1828,7 @@ export interface FleetAgent {
   outcomeUntil?: string;
   changesRequested?: string;
   state: string;
+  waitingForImage?: boolean;
   memory?: MemoryHold;
   reclaimed?: string;
   ip: string;
