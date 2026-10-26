@@ -100,6 +100,8 @@ import { AgentList, AgentStrip } from './AgentList';
 import { chatOf } from './PanelButton';
 import { useOpenReview, useProjectReview } from './ReviewV2';
 import { PickButton, usePicker } from '../PickElement';
+import { RichBeside } from '../chat/RichBlock';
+import { titleOf } from '../../lib/rich';
 import { IssuesPanel } from '../IssuesPanel';
 
 const viewIcon: Record<PanelView, LucideIcon> = {
@@ -276,6 +278,10 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
   // unless it was a past agent when it was picked: it shows the list.
   if (lead && whose?.kind === 'past' && stored && !isPastRef(stored)) whose = undefined;
   const ref = whose && whoseRef(whose);
+  // A rich block opened beside the chat goes over all of it, as the
+  // project's own views do (RichBeside).
+  const preview = panel.preview;
+  const over = !!(panel.wide || preview);
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.projects });
   const projectName = projectLabel(project, projects.data);
   // An agent of an Android project, or with an emulator running, has Android
@@ -291,16 +297,16 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
   // Issues, beside it, is named by the switch the same way.
   const pulls = lead && (panel.wide === 'pulls' || panel.wide === 'issues');
   // Schedules, picked on an agent's switch, keeps the agent's header.
-  const home = lead && (pulls || (panel.wide === 'schedules' && (!whose || whose.kind === 'lead')) || (!panel.wide && (!whose || whose.kind === 'lead')));
+  const home = lead && !preview && (pulls || (panel.wide === 'schedules' && (!whose || whose.kind === 'lead')) || (!over && (!whose || whose.kind === 'lead')));
   // An agent's header, or whoever else's the panel shows but the lead's home.
-  const switcher = !!whose && !home;
+  const switcher = !!whose && !home && !preview;
   const fit = useNamedFit(`${ref}:${view}:${android}`);
 
-  if (!whose && !panel.wide && state.listFolded && !drawer) return <AgentStrip project={project} chat={chat} onSelect={onSelect} onUnfold={() => setPanel({ listFolded: false })} />;
+  if (!whose && !over && state.listFolded && !drawer) return <AgentStrip project={project} chat={chat} onSelect={onSelect} onUnfold={() => setPanel({ listFolded: false })} />;
   return (
-    <div className="flex min-w-0 flex-1 flex-col" data-panel-view={view ?? listTarget} data-panel-whose={ref}>
+    <div className="flex min-w-0 flex-1 flex-col" data-panel-view={preview ? 'preview' : (view ?? listTarget)} data-panel-whose={ref}>
       <div ref={fit.row} className={cn('flex h-11 shrink-0 items-center overflow-hidden border-b border-line-faint bg-rail pl-2 pr-1.5', fit.named ? 'gap-1.5' : 'gap-1')}>
-        {(whose || panel.wide) && !home && (
+        {(whose || over) && !home && (
           <Tip label={t('panel.back')}>
             <Button
               size="icon-sm"
@@ -309,7 +315,7 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
               onClick={() => {
                 // In an agent's chat, opened from the lead's list, back is to
                 // the lead's chat and its list, in one click.
-                if (!lead && !panel.wide) {
+                if (!lead && !over) {
                   panelBack(leadOf(project));
                   setPanelOpen(leadOf(project), true);
                   onSelect({ kind: 'project', project });
@@ -321,7 +327,11 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
             </Button>
           </Tip>
         )}
-        {home ? (
+        {preview ? (
+          <span className="min-w-0 truncate pl-1 text-[12.5px] font-semibold text-title" data-panel-preview-title>
+            {titleOf(preview.kind, preview.code, t(`chat.rich.${preview.kind}`))}
+          </span>
+        ) : home ? (
           <LeadSwitch project={project} tab={leadTab(state, project)} files={view === 'files'} count={agents.length} />
         ) : whose ? (
           <WhoseTitle project={project} chat={chat} whose={whose} roomy={fit.named} onSelect={onSelect} />
@@ -335,22 +345,22 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
         )}
         {whose && switcher && <ViewSwitch chat={chat} whose={whose} views={viewsOf(whose, android)} view={view} named={fit.named} booted={androidStatus.data?.booted === true} />}
         <span className="min-w-0 flex-1" />
-        {!whose && !panel.wide && (
+        {!whose && !over && (
           <Tip label={t('agent.rail.newAgentIn', { project: projectName })}>
             <Button size="icon-sm" variant="ghost" aria-label={t('agent.rail.newAgentIn', { project: projectName })} onClick={() => onNewAgent(project)} data-panel-new-agent>
               <Plus />
             </Button>
           </Tip>
         )}
-        {lead && !switcher && <ProjectButtons project={project} chat={chat} wide={panel.wide} onSelect={onSelect} />}
-        {!whose && !panel.wide && (
+        {!preview && lead && !switcher && <ProjectButtons project={project} chat={chat} wide={panel.wide} onSelect={onSelect} />}
+        {!whose && !over && (
           <Tip label={t('panel.list.fold')}>
             <Button size="icon-sm" variant="ghost" aria-label={t('panel.list.fold')} onClick={() => (drawer ? setPanelOpen(chat, false) : setPanel({ listFolded: true }))} data-panel-fold>
               <ChevronsRight />
             </Button>
           </Tip>
         )}
-        {(whose || panel.wide) && !home && (
+        {(whose || over) && !home && (
           <Tip label={t('panel.back')}>
             <Button size="icon-sm" variant="ghost" aria-label={t('panel.back')} onClick={() => panelClose(chat)} data-panel-close>
               <X />
@@ -358,8 +368,10 @@ function RightPanel({ project, chat, width, drawer, onSelect, onNewAgent }: { pr
           </Tip>
         )}
       </div>
-      <ErrorBoundary key={`${ref ?? listTarget}:${view ?? ''}`} fallback={<p className="p-4 text-xs text-subtle">{t('panel.failed')}</p>}>
-        {panel.wide ? (
+      <ErrorBoundary key={`${ref ?? listTarget}:${preview ? 'preview' : (view ?? '')}`} fallback={<p className="p-4 text-xs text-subtle">{t('panel.failed')}</p>}>
+        {preview ? (
+          <RichBeside key={preview.code} chat={chat} preview={preview} />
+        ) : panel.wide ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <ProjectView project={project} chat={chat} view={panel.wide} section={state.section} titled={!pulls} onSelect={onSelect} />
           </div>
