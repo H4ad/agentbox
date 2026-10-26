@@ -52,6 +52,8 @@
 //                           Start, or sending a message, wakes it after 1.5s
 //   ?chat=richstream        a rich block still arriving (a card); &done=1 the stream ended
 //                           unclosed (its code); &tall=1 a closed page taller than the frame
+//   ?chat=longturn          one long agent turn: searches, reads, edits, a test
+//                           failing then passing; &done=1 finished
 //   ?chat=rich              a project chat's answer with each kind of rich block
 //                           (lib/rich.ts); &narrow=1 in a 340px column; &wide=1 in the
 //                           chat's scroller (&files=1 beside a 340px panel)
@@ -272,6 +274,7 @@ import { leadAgentFrom } from '../components/ProjectChatPanel';
 import { api } from '../lib/api';
 import type { AgentPlaceName, ProjectPlaceName } from '../lib/tabs';
 import { Markdown } from '../components/chat/Markdown';
+import { LONG_TURN_ROOT, longTurnChat } from './longTurn';
 import { agent12Chat, asleepChat, buildFixtures, claudeLimits, dropDevAgent, compactionThread, richChat, richStreamText, freeRun, leadChat, installDevBridge, PROJECT, pullRequests,  seedDefaults, seedAllMedia, seedMedia, seedImageUpdate, seedSettings, seedSignedOut, seedNightly, seedMeterUsage, seedVMDisk, seedPower, seedQueryClient, seedLinuxHost, seedLinuxVM, setNotifications } from './fixtures';
 import { publishOne, seedPages } from './pages';
 import { seedPastAgents } from './pastAgents';
@@ -957,6 +960,16 @@ function Preview() {
         ) : chat === 'stopped' || chat === 'paused' ? (
           <div style={{ height: '100%', margin: -24 }}>
             <AsleepChatPreview state={chat} agent={fixtures.agents.find((a) => a.ref === `${PROJECT}/agent-99`)!} />
+          </div>
+        ) : chat === 'longturn' ? (
+          // One long agent turn in the chat's own scroller and column;
+          // &done=1 finished, its fold opened by a scenario's click.
+          <div style={{ display: 'flex', height: '100%', margin: -24 }} data-long-turn>
+            <div className="chat-scroller" style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+              <div className="mx-auto w-full max-w-4xl px-4 pb-10 pt-6 md:px-6">
+                <Timeline agent={{ ...fixtures.agents.find((a) => a.ref === `${PROJECT}/agent-12`)!, worktree: LONG_TURN_ROOT }} thread={longTurnChat(!!params.get('done'))} />
+              </div>
+            </div>
           </div>
         ) : chat === 'rich' && params.get('wide') ? (
           // The chat's own scroller and column, to see the blocks break out of the
