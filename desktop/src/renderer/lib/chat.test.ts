@@ -12,7 +12,11 @@ import {
   chatKey,
   contextHint,
   currentPlan,
+  editCounts,
   entryLabel,
+  failureExcerpt,
+  inWorktree,
+  thoughtPreview,
   formatDuration,
   formatTokens,
   isActive,
@@ -708,4 +712,52 @@ test('agentPermissionState reads an agent request a lead shows as its outcome fo
   assert.equal(agentPermissionState(p('always')), 'approvedAlways');
   assert.equal(agentPermissionState(p('reject')), 'denied');
   assert.equal(agentPermissionState(p('cancelled')), 'gone');
+});
+
+test('inWorktree shows paths in the worktree relative to it, and leaves a sibling alone', () => {
+  const root = '/home/u/wt/agent-1';
+  assert.equal(inWorktree('Read /home/u/wt/agent-1/src/a.ts', root), 'Read src/a.ts');
+  assert.equal(inWorktree('cd /home/u/wt/agent-1 && ls', root), 'cd . && ls');
+  assert.equal(inWorktree('Read /home/u/wt/agent-12/a.ts', root), 'Read /home/u/wt/agent-12/a.ts');
+  assert.equal(inWorktree('Read /x/a.ts', undefined), 'Read /x/a.ts');
+});
+
+test('entryLabel drops the adapter\'s backticks and the worktree from a title and a command', () => {
+  const root = '/w/agent-1';
+  assert.equal(entryLabel(item({ kind: 'tool', tool: tool({ kind: 'edit', title: 'Edit `/w/agent-1/src/a.ts`' }) }), root), 'Edit src/a.ts');
+  assert.equal(entryLabel(item({ kind: 'tool', tool: tool({ kind: 'execute', title: '`x`', command: 'go test /w/agent-1/...' }) }), root), 'go test ./...');
+  assert.equal(liveLabel(item({ kind: 'tool', tool: tool({ kind: 'execute', status: 'in_progress', command: 'ls /w/agent-1/src' }) }), root), 'Running ls src');
+});
+
+test('entryLabel shows a thought by its heading or first sentence', () => {
+  assert.equal(entryLabel(item({ kind: 'thought', text: '**Finding the total**\n\nIt is summed per day.' })), 'Finding the total');
+  assert.equal(thoughtPreview('The `total` is   summed per **day**. Then the card reads it.'), 'The total is summed per day.');
+  assert.equal(thoughtPreview('no full stop'), 'no full stop');
+  assert.equal(thoughtPreview('   '), '');
+});
+
+test('failureExcerpt picks the line that says what failed, and the one after it', () => {
+  assert.equal(failureExcerpt('> test\n  ✔ ok\n  ✖ adds DST\n    AssertionError: 4 !== 3\nℹ fail 1'), '✖ adds DST\nAssertionError: 4 !== 3');
+  assert.equal(failureExcerpt('ok 1\npass 3, fail 0\nexit status 2\n'), 'pass 3, fail 0\nexit status 2');
+  assert.equal(failureExcerpt(undefined), '');
+});
+
+test('editCounts sums a finished edit\'s diffs, and is nothing for a call without one', () => {
+  const diffs = [{ path: 'a', oldText: 'x\n', newText: 'y\nz\n' }, { path: 'b', oldText: 'q\n', newText: '' }];
+  assert.deepEqual(editCounts(tool({ kind: 'edit', diffs })), { added: 2, removed: 2 });
+  assert.equal(editCounts(tool({ kind: 'edit', diffs, status: 'failed' })), undefined);
+  assert.equal(editCounts(tool({ kind: 'read' })), undefined);
+});
+
+test('timelineRows gives a failed tool call a row of its own between the groups around it', () => {
+  const user = item({ kind: 'user' });
+  const read = item({ kind: 'tool', turn: user.id, tool: tool({ kind: 'read' }) });
+  const edit = item({ kind: 'tool', turn: user.id, tool: tool({ kind: 'edit' }) });
+  const failed = item({ kind: 'tool', turn: user.id, tool: tool({ kind: 'execute', status: 'failed' }) });
+  const again = item({ kind: 'tool', turn: user.id, tool: tool({ kind: 'execute', status: 'in_progress' }) });
+  const work = timelineRows(thread([user, read, edit, failed, again]), new Set()).filter((r) => r.type === 'work');
+  assert.deepEqual(
+    work.map((r) => (r.type === 'work' ? [r.items.map((it) => it.id), r.live] : [])),
+    [[[read.id, edit.id], false], [[failed.id], false], [[again.id], true]],
+  );
 });

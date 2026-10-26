@@ -2102,29 +2102,39 @@
     "description": "One long agent turn still at work: a search, reads, three edits, a test that failed, and the second run going — dark",
     "query": "chat=longturn&theme=dark",
     "width": 1100,
-    "height": 1400
+    "height": 800
   },
   {
     "id": "chat-longturn-done-dark",
-    "description": "The same turn finished, its work opened from the fold — dark",
+    "description": "The same turn finished, its fold and every work group opened — dark",
     "query": "chat=longturn&done=1&theme=dark",
     "width": 1100,
-    "height": 1600,
-    "click": "[data-chat-fold]"
+    "height": 1300,
+    "click": [
+      "[data-chat-fold]",
+      ":nth-match([data-chat-work=group] > button, 1)",
+      ":nth-match([data-chat-work=group] > button, 2)",
+      ":nth-match([data-chat-work=group] > button, 3)"
+    ]
   },
   {
     "id": "chat-longturn-running-light",
     "description": "One long agent turn still at work: a search, reads, three edits, a test that failed, and the second run going — light",
     "query": "chat=longturn&theme=light",
     "width": 1100,
-    "height": 1400
+    "height": 800
   },
   {
     "id": "chat-longturn-done-light",
-    "description": "The same turn finished, its work opened from the fold — light",
+    "description": "The same turn finished, its fold and every work group opened — light",
     "query": "chat=longturn&done=1&theme=light",
     "width": 1100,
-    "height": 1600,
-    "click": "[data-chat-fold]"
+    "height": 1300,
+    "click": [
+      "[data-chat-fold]",
+      ":nth-match([data-chat-work=group] > button, 1)",
+      ":nth-match([data-chat-work=group] > button, 2)",
+      ":nth-match([data-chat-work=group] > button, 3)"
+    ]
   }
 ]

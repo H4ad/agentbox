@@ -21,7 +21,7 @@ import { memo, use, useState, type ReactNode } from 'react';
 import { ChatRefContext } from './chatRef';
 import type * as T from '../../../shared/api';
 import { isHomeChat } from '../../lib/api';
-import { entryLabel, isActive, isWork, liveLabel, workSummary } from '../../lib/chat';
+import { editCounts, entryLabel, failureExcerpt, isActive, isWork, liveLabel, workSummary } from '../../lib/chat';
 import { livePageOf, openPage, pageIdOf } from '../../lib/pages';
 import { useT } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
@@ -69,7 +69,7 @@ export const WorkGroup = memo(
             <span className="flex size-6 shrink-0 items-center justify-center text-subtle">
               <Icon className="size-4" strokeWidth={1.8} />
             </span>
-            <span className="chat-shine min-w-0 truncate">{liveLabel(last)}</span>
+            <span className="chat-shine min-w-0 truncate">{liveLabel(last, root)}</span>
             {items.length > 1 && <span className="shrink-0 text-xs tabular-nums text-faint">+{items.length - 1}</span>}
             <ChevronRight className={cn('size-3 shrink-0 text-faint transition-transform', open && 'rotate-90')} />
           </button>
@@ -140,7 +140,7 @@ function PageEntry({ item, root }: { item: T.ChatItem; root: string }) {
           <span className="flex size-6 shrink-0 items-center justify-center text-amber-300/80">
             <PageIcon className="size-4" />
           </span>
-          <span className="min-w-0 truncate text-subtle underline decoration-line-strong underline-offset-[3px] group-hover/row:text-primary group-hover/row:decoration-current">{entryLabel(item)}</span>
+          <span className="min-w-0 truncate text-subtle underline decoration-line-strong underline-offset-[3px] group-hover/row:text-primary group-hover/row:decoration-current">{entryLabel(item, root)}</span>
         </button>
         {detail && (
           <button className="flex size-6 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-faint hover:text-muted" aria-expanded={open} aria-label={t('pages.callDetails')} onClick={() => setOpen(!open)}>
@@ -161,6 +161,9 @@ function ToolEntry({ item, root }: { item: T.ChatItem; root: string }) {
   const failed = item.tool?.status === 'failed';
   const active = isActive(item);
   const file = item.tool?.paths?.[0];
+  const counts = editCounts(item.tool);
+  // A failed call says why under its row, until it's opened to all it printed.
+  const excerpt = failed && !open ? failureExcerpt(item.tool?.output) : '';
   return (
     <div className="min-w-0" data-chat-entry={item.kind}>
       <div className="group/file flex min-w-0 items-center">
@@ -173,13 +176,24 @@ function ToolEntry({ item, root }: { item: T.ChatItem; root: string }) {
           <Icon className="size-4" strokeWidth={1.8} />
         </span>
         <span className={cn('min-w-0 truncate', failed ? 'text-rose-300/80' : 'text-subtle group-hover/row:text-muted', active && 'chat-shine')}>
-          {active ? liveLabel(item) : entryLabel(item)}
+          {active ? liveLabel(item, root) : entryLabel(item, root)}
         </span>
+        {counts && (
+          <span className="shrink-0 font-mono text-[11.5px]" data-chat-edit-counts>
+            <span className={counts.added ? 'text-emerald-400' : 'text-faint'}>+{counts.added}</span>{' '}
+            <span className={counts.removed ? 'text-rose-400' : 'text-faint'}>−{counts.removed}</span>
+          </span>
+        )}
         {item.tool?.status === 'stopped' && <span className="shrink-0 text-xs text-faint">{t('chat.work.stopped')}</span>}
         {detail && <ChevronRight className={cn('size-3 shrink-0 text-faint transition-transform', open && 'rotate-90')} />}
       </button>
       {file && <OpenFileButton path={file} line={item.tool?.line} className="opacity-0 focus-visible:opacity-100 group-hover/file:opacity-100" />}
       </div>
+      {excerpt && (
+        <pre className="mb-1 ml-7 line-clamp-2 whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-rose-300/70" data-chat-failure>
+          {excerpt}
+        </pre>
+      )}
       {open && detail && <div className="mb-1.5 ml-7 mt-0.5 overflow-hidden rounded-lg border border-line-faint bg-sunken">{detail}</div>}
     </div>
   );
@@ -230,7 +244,7 @@ export const SubagentCard = memo(
     const running = sub.state === 'running';
     const work = children.filter(isWork);
     const current = running ? children.findLast((it) => isActive(it)) : undefined;
-    const summary = current ? liveLabel(current) : work.length > 0 ? workSummary(work) : running ? t('chat.subagent.starting') : t('chat.subagent.didNothing');
+    const summary = current ? liveLabel(current, root) : work.length > 0 ? workSummary(work) : running ? t('chat.subagent.starting') : t('chat.subagent.didNothing');
     return (
       <div className="pb-2" data-chat-subagent={sub.state}>
         <div className="rounded-xl border border-line-faint bg-surface-faint">

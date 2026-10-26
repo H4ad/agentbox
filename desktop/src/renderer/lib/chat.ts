@@ -506,6 +506,14 @@ export function timelineRows(thread: T.ChatThread, openTurns: ReadonlySet<string
     for (const it of body) {
       if (!open && folds(it)) continue;
       if (isWork(it)) {
+        // A call that failed is a row of its own, as t3code's are: what went
+        // wrong — a test that failed, a push refused — is what a long turn is
+        // read for, and inside a summary it was a dot to click open.
+        if (it.tool?.status === 'failed') {
+          endGroup(false);
+          rows.push({ type: 'work', key: `work:${it.id}`, items: [it], live: false });
+          continue;
+        }
         group.push(it);
         // A credential request the agent is still blocked on gets its card
         // right under the call, where the spinner is: it is the one thing in
@@ -651,9 +659,49 @@ export function workSummary(items: T.ChatItem[]): string {
 
 const fileName = (path: string) => path.split('/').filter(Boolean).at(-1) ?? path;
 
-// entryLabel is what a work row says about a finished item.
-export function entryLabel(it: T.ChatItem): string {
-  if (it.kind === 'thought') return t('chat.work.thoughtDone');
+// inWorktree shortens what a tool call says about the agent's worktree:
+// AgentBox's tools see it at an absolute path, which a narrow row truncates
+// right where the file's name is. Inside it, a path reads as relative to it,
+// and the worktree itself as ".".
+export function inWorktree(text: string, root?: string): string {
+  if (!root || root === '/' || !text.includes(root)) return text;
+  const escaped = root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Go's "./..." keeps its dot: "..." alone would read as an ellipsis.
+  return text.replace(new RegExp(`${escaped}(/\\.\\.\\.|/|(?![\\w.-]))`, 'g'), (_, rest: string) => (rest === '/' ? '' : `.${rest}`));
+}
+
+// plainTitle is a tool call's title as a line of text: Claude Code's adapter
+// quotes paths and commands in backticks ("Edit `/…/a.ts`").
+const plainTitle = (title: string) => title.replace(/`([^`\n]*)`/g, '$1');
+
+// thoughtPreview is a thought in one line, as t3code shows one: its first bold
+// heading, which is how Claude titles a step of its thinking, or else its
+// first sentence, with the markdown taken out. The row truncates the rest.
+export function thoughtPreview(text: string | undefined): string {
+  const flat = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!flat) return '';
+  const heading = flat.match(/^\*\*([^*]+)\*\*/);
+  if (heading) return heading[1].trim();
+  const plain = flat.replace(/[*_]{1,2}([^*_]+)[*_]{1,2}/g, '$1').replace(/`([^`]*)`/g, '$1');
+  return plain.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? plain;
+}
+
+// failureExcerpt is the line or two of a failed call's output that say why,
+// shown under its row so you don't open it to find out: the first line that
+// names an error or a failure, with the one after it, or else the output's
+// last two lines, where a command usually says how it ended.
+export function failureExcerpt(output: string | undefined): string {
+  const lines = (output ?? '').split('\n').map((l) => l.trimEnd()).filter((l) => l.trim());
+  if (lines.length === 0) return '';
+  const at = lines.findIndex((l) => /\b(error|errors|fail|failed|failure|fatal|panic|exception|denied|refused|not found)\b|✖|✗|✘/i.test(l) && !/\b(0 fail(ed|ures)?|fail(ed|ures)?:? 0)\b/i.test(l));
+  const picked = at >= 0 ? lines.slice(at, at + 2) : lines.slice(-2);
+  return picked.map((l) => (l.length > 200 ? `${l.slice(0, 200)}…` : l.trim())).join('\n');
+}
+
+// entryLabel is what a work row says about a finished item. root is the
+// agent's worktree, which paths in it are shown relative to.
+export function entryLabel(it: T.ChatItem, root?: string): string {
+  if (it.kind === 'thought') return thoughtPreview(it.text) || t('chat.work.thoughtDone');
   if (it.kind === 'permission') {
     const perm = it.permission!;
     const option = perm.options.find((o) => o.id === perm.outcome);
@@ -661,29 +709,43 @@ export function entryLabel(it: T.ChatItem): string {
     return t('chat.work.permission', { outcome, title: perm.title });
   }
   const tool = it.tool!;
-  if (tool.kind === 'execute' && tool.command) return tool.command;
-  return tool.title || tool.name || t('chat.work.toolCall');
+  if (tool.kind === 'execute' && tool.command) return inWorktree(tool.command, root);
+  return inWorktree(plainTitle(tool.title || tool.name || t('chat.work.toolCall')), root);
 }
 
 // liveLabel is what a work row says about an item while it happens.
-export function liveLabel(it: T.ChatItem): string {
+export function liveLabel(it: T.ChatItem, root?: string): string {
   if (it.kind === 'thought') return t('chat.work.thinking');
   const tool = it.tool;
-  if (!tool || !isActive(it)) return entryLabel(it);
+  if (!tool || !isActive(it)) return entryLabel(it, root);
   const path = tool.paths?.[0];
+  const title = inWorktree(plainTitle(tool.title), root);
   switch (tool.kind) {
     case 'execute':
-      return t('chat.work.running', { what: tool.command || tool.title });
+      return t('chat.work.running', { what: tool.command ? inWorktree(tool.command, root) : title });
     case 'edit':
-      return path ? t('chat.work.editing', { name: fileName(path) }) : tool.title;
+      return path ? t('chat.work.editing', { name: fileName(path) }) : title;
     case 'read':
-      return path ? t('chat.work.reading', { name: fileName(path) }) : tool.title;
+      return path ? t('chat.work.reading', { name: fileName(path) }) : title;
     case 'search':
-      return t('chat.work.searching', { what: tool.title });
+      return t('chat.work.searching', { what: title });
     case 'fetch':
-      return t('chat.work.fetching', { what: tool.title });
+      return t('chat.work.fetching', { what: title });
   }
-  return tool.title || tool.name || t('chat.work.working');
+  return title || tool.name || t('chat.work.working');
+}
+
+// editCounts is the lines a finished edit added and removed, for its row.
+export function editCounts(tool: T.ChatTool | undefined): { added: number; removed: number } | undefined {
+  if (!tool?.diffs?.length || tool.status !== 'completed') return undefined;
+  let added = 0;
+  let removed = 0;
+  for (const diff of tool.diffs) {
+    const counts = lineCounts(diff);
+    added += counts.added;
+    removed += counts.removed;
+  }
+  return { added, removed };
 }
 
 export interface ChangedFile {
