@@ -13,7 +13,7 @@ import (
 // project's GitHub repository (an event trigger: "when CI goes red on main,
 // have an agent fix it"). Each run wakes the lead with the task, or creates
 // an agent with it. The daemon owns them; the app, the command line
-// and the lead's schedule_task tool all go through these routes.
+// and the lead's schedules tool all go through these routes.
 
 // What a schedule's run does: Schedule.Target.
 const (

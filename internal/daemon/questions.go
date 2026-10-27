@@ -143,7 +143,7 @@ func questionNotice(q state.Question) string {
 	if q.Context != "" {
 		notice += "\n\nWhat it was doing: " + q.Context
 	}
-	return notice + fmt.Sprintf("\n\nanswer_question (id %s), or escalate_question if it is genuinely the user's call.", q.ID)
+	return notice + fmt.Sprintf("\n\nquestions answer (id %s), or escalate if it is genuinely the user's call.", q.ID)
 }
 
 // answerQuestion records an answer and hands it to the waiting agent.
@@ -204,7 +204,7 @@ func (s *Server) leadAnswerQuestion(w http.ResponseWriter, r *http.Request) erro
 	}
 	if q.Credential() {
 		if s.leadManaged(r.Context(), q) {
-			return fmt.Errorf("$%s is managed by you, but never answered with text: refresh it if needed, then call fulfil_credential (id %s), "+
+			return fmt.Errorf("$%s is managed by you, but never answered with text: refresh it if needed, then call questions fulfil (id %s), "+
 				"which gives %s the stored value by name", q.SecretName, q.ID, q.Agent)
 		}
 		return errOnlyTheUser(q)

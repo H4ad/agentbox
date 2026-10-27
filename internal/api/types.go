@@ -1870,7 +1870,7 @@ type IssuePullRequest struct {
 }
 
 // ProjectIssues is a project repository's open issues, as the Issues view and
-// the lead's list_issues read them. The repository fields say the same as
+// the lead's list_resources issues read them. The repository fields say the same as
 // ProjectPullRequests' do.
 type ProjectIssues struct {
 	Project         string       `json:"project"`

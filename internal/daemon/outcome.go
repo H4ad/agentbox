@@ -396,7 +396,7 @@ func limitedNotice(a state.Agent, until time.Time) string {
 		when = "AgentBox resumes it at " + until.Format("15:04 MST")
 	}
 	return fmt.Sprintf("[AgentBox: %s (%s) hit its usage limit and is paused, not finished: %s. "+
-		"switch_agent_account moves it to another account with room (list_accounts); otherwise nothing to do.]",
+		"switch_agent_account moves it to another account with room (list_resources accounts); otherwise nothing to do.]",
 		a.Name, titleOrNone(a.Title), when)
 }
 

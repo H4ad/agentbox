@@ -180,7 +180,7 @@ func leadManagedNotice(q state.Question) string {
 	return fmt.Sprintf("%s asked for the secret $%s: %s\n\n$%s is managed by you: the user lets you fulfil requests for it. "+
 		"Refresh it first if it may be stale, the way you keep it fresh, piping the new value into "+
 		"`agentbox secrets set %s %s --value-stdin` so it is never an argument or in your output, then call "+
-		"fulfil_credential (id %s): the agent gets the stored value by name. Never put the value in this chat. "+
+		"questions fulfil (id %s): the agent gets the stored value by name. Never put the value in this chat. "+
 		"The user can still answer it from their card; whichever answer comes first is the one the agent gets.",
 		q.Agent, q.SecretName, q.Text, q.SecretName, q.Project, q.SecretName, q.ID)
 }
@@ -202,7 +202,7 @@ func (s *Server) leadFulfilCredential(w http.ResponseWriter, r *http.Request) er
 		if q.Credential() {
 			return errOnlyTheUser(q)
 		}
-		return fmt.Errorf("question %s asks for a decision, not a secret: answer it with answer_question", q.ID)
+		return fmt.Errorf("question %s asks for a decision, not a secret: answer it with questions answer", q.ID)
 	}
 	sec, err := s.store.Secret(ctx, q.Project, "", q.SecretName)
 	if errors.Is(err, state.ErrNotFound) || (err == nil && !sec.LeadManaged) {

@@ -89,14 +89,14 @@ func TestLeadFulfilsALeadManagedSecret(t *testing.T) {
 		Kind: "secret", Name: "AZURE_TOKEN", Reason: "az account show: the token has expired",
 	})
 	notice := notices.last(t)
-	if !notice.act || !strings.Contains(notice.text, "managed by you") || !strings.Contains(notice.text, "fulfil_credential (id "+id+")") ||
+	if !notice.act || !strings.Contains(notice.text, "managed by you") || !strings.Contains(notice.text, "questions fulfil (id "+id+")") ||
 		!strings.Contains(notice.text, "--value-stdin") {
 		t.Errorf("the lead was told %+v, want it woken and told it may fulfil the request", notice)
 	}
 
 	// Never with text, even for a secret it manages.
-	if code, body := leadAnswers(t, d, id); code == http.StatusOK || !strings.Contains(body, "fulfil_credential") {
-		t.Errorf("the lead answering with text = %d %s, want it pointed at fulfil_credential", code, body)
+	if code, body := leadAnswers(t, d, id); code == http.StatusOK || !strings.Contains(body, "questions fulfil") {
+		t.Errorf("the lead answering with text = %d %s, want it pointed at questions fulfil", code, body)
 	}
 
 	// The lead's script refreshes the value; setting it again keeps the flag.

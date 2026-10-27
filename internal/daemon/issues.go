@@ -137,7 +137,7 @@ func (s *Server) projectIssues(w http.ResponseWriter, r *http.Request) error {
 	return writeJSON(w, http.StatusOK, s.listIssues(r.Context(), p, r.URL.Query().Get("refresh") == "1"))
 }
 
-// leadIssues answers GET /v1/project/issues, the lead's list_issues.
+// leadIssues answers GET /v1/project/issues, the lead's list_resources issues.
 func (s *Server) leadIssues(w http.ResponseWriter, r *http.Request) error {
 	p, err := s.store.Project(r.Context(), r.PathValue("project"))
 	if err != nil {

@@ -1318,7 +1318,7 @@ var migrations = []string{
 	`ALTER TABLE agents ADD COLUMN stopped_at INTEGER NOT NULL DEFAULT 0`,
 	// A project secret the lead keeps fresh (a token its own script refreshes):
 	// a credential request for it wakes the lead, which may fulfil it from the
-	// stored value by name (fulfil_credential). Agents' own secrets stay 0.
+	// stored value by name (questions fulfil). Agents' own secrets stay 0.
 	`ALTER TABLE secrets ADD COLUMN lead_managed INTEGER NOT NULL DEFAULT 0`,
 	// Whether this project hands its GitHub issues labelled agentbox to new
 	// agents by itself (Project.PickUpIssues, issues.go). Off by default.

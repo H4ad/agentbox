@@ -29,7 +29,7 @@ type Secret struct {
 	Warning string `json:"warning,omitempty"`
 	// LeadManaged, for a project secret, means the project's lead keeps it
 	// fresh and may fulfil agents' credential requests for it with the stored
-	// value, by name (fulfil_credential): it never reads the value either.
+	// value, by name (questions fulfil): it never reads the value either.
 	LeadManaged bool `json:"leadManaged"`
 }
 
