@@ -174,6 +174,11 @@ func (c *conversation) consolidate(ctx context.Context, ad *adapter, ask, kind s
 		SessionID: sessionID,
 		Prompt:    []acp.ContentBlock{{Type: "text", Text: ask}},
 	}, &res)
+	if err != nil && ctx.Err() != nil {
+		// The caller gave up, but the tool hasn't: stop the prompt, so what it
+		// would still say doesn't land in whatever runs on the session next.
+		_ = ad.conn.Notify(acp.MethodSessionCancel, acp.CancelNotification{SessionID: sessionID})
+	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -188,10 +193,13 @@ func (c *conversation) consolidate(ctx context.Context, ad *adapter, ask, kind s
 		return answer, err
 	}
 	if strings.TrimSpace(answer) == "" {
-		return "", errors.New("the session said nothing")
+		return "", errSaidNothing
 	}
 	return answer, nil
 }
+
+// errSaidNothing is a hidden prompt that answered with no text.
+var errSaidNothing = errors.New("the session said nothing")
 
 // Rollover ends the chat's session and leaves its conversation where it is.
 //
@@ -288,6 +296,17 @@ func (c *conversation) hold(text string, sent attached) *api.ChatItem {
 	c.outbox = append(c.outbox, &outgoing{item: it.ID, text: text, sent: sent})
 	c.compaction.Compaction.Waiting++
 	c.touch(c.compaction)
+	c.flush(true)
+	return it
+}
+
+// waitHidden takes a message sent while a keepalive is in flight. It goes
+// into the conversation at once, waiting, and settleRolling starts its turn
+// when the keepalive answers. The conversation is locked and no turn runs.
+func (c *conversation) waitHidden(text string, sent attached) *api.ChatItem {
+	it := c.add("aside", c.lastTurn())
+	it.Text, it.Images, it.Files, it.Delivery = text, sent.images, sent.files, api.ChatAsideWaiting
+	c.outbox = append(c.outbox, &outgoing{item: it.ID, text: text, sent: sent})
 	c.flush(true)
 	return it
 }
