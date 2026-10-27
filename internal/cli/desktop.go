@@ -25,7 +25,7 @@ func newDesktopCmd(a *app) *cobra.Command {
 		Use:   "desktop",
 		Short: "The agent's virtual desktop: mouse, keyboard and screenshots of the whole display",
 	}
-	cmd.AddCommand(newDesktopMCPCmd(a), newDesktopGuardCmd(), newDesktopRecordCmd())
+	cmd.AddCommand(newDesktopMCPCmd(a), newDesktopGuardCmd(), newDesktopRecordCmd(), newDesktopEditCmd())
 	return cmd
 }
 
@@ -109,5 +109,35 @@ func newDesktopRecordCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.NoTrim, "no-trim", false, "keep every frame, the screen standing still included")
 	cmd.Flags().BoolVar(&opts.WholeDisplay, "whole-display", false, "film the display as it is, without making the browser fullscreen first")
 	cmd.Flags().StringVar(&opts.Cuts, "cuts", "", "a file to write the stretches cut out to, as JSON, once the recording is finished")
+	cmd.Flags().StringVar(&opts.Events, "events", "", "with --input desktop, a file to write the clicks and keys to, one JSON object a line")
+	return cmd
+}
+
+// newDesktopEditCmd edits a recording: the camera zooms in on where the input
+// is, and the notes are captions on it. StopRecording runs it in the agent,
+// on what the recorder left beside the video.
+func newDesktopEditCmd() *cobra.Command {
+	var events, cuts, notes, title, subtitle string
+	var start float64
+	cmd := &cobra.Command{
+		Use:    "edit <in> <out>",
+		Short:  "Edit a recording: zoom in on the clicks and caption the chapters",
+		Hidden: true,
+		Args:   cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			e, err := desktop.ReadEdit(events, cuts, notes, start)
+			if err != nil {
+				return err
+			}
+			e.Title, e.Subtitle = title, subtitle
+			return e.Render(cmd.Context(), args[0], args[1], os.Stderr)
+		},
+	}
+	cmd.Flags().StringVar(&events, "events", "", "the recorder's --events file")
+	cmd.Flags().StringVar(&cuts, "cuts", "", "the recorder's --cuts file")
+	cmd.Flags().StringVar(&notes, "notes", "", `the chapters, one {"t", "text"} a line`)
+	cmd.Flags().Float64Var(&start, "start", 0, "when the recording started, in Unix seconds, for one with no --cuts")
+	cmd.Flags().StringVar(&title, "title", "", "a title card to open on")
+	cmd.Flags().StringVar(&subtitle, "subtitle", "", "a line under the title")
 	return cmd
 }

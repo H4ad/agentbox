@@ -992,6 +992,7 @@ export interface MediaMeta {
   tests?: TestCounts;
   recorded?: number;
   cuts?: MediaCut[];
+  raw?: string;
 }
 
 export interface MediaCut {
@@ -1044,6 +1045,7 @@ export interface RecordRequest {
   limitSeconds?: number;
   noTrim?: boolean;
   wholeDisplay?: boolean;
+  noEdit?: boolean;
 }
 
 export interface RecordingStatus {
