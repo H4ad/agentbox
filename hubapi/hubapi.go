@@ -3,13 +3,13 @@
 // how the tunnel between them is framed.
 //
 // It is the seam between the two halves of AgentBox. Everything here is
-// implemented on both sides — by the client in this repository, and by the hub,
-// which is a separate program. It carries no server: nothing here reads a
+// implemented on both sides — by the client (internal/remote, the daemon) and
+// by the hub (hub/), which is a separate program. It carries no server: nothing here reads a
 // database, checks a password or decides who may see what. A hub does all of
 // that, and this package says nothing about how.
 //
-// Unlike the rest of AgentBox's packages this one is not internal, because a
-// hub has to be able to import it.
+// Unlike the rest of AgentBox's packages this one is not internal: it is the
+// one thing the hub imports from the rest of AgentBox.
 package hubapi
 
 // Tokens a hub issues carry a prefix saying what they are, so a client can tell
@@ -81,6 +81,12 @@ const (
 	// that gives them out answers HubEnvironmentTunnel, the same hostname every
 	// time; one that doesn't answers 404 or 501.
 	PathEnvironmentTunnel = "/v1/environment/tunnel"
+	// PathEnvironmentAddress is where an environment on a Tailscale hub
+	// reports the address it serves on in the tailnet: POST a
+	// HubEnvironmentAddress, with its environment token. The hub lists it on
+	// the environment (HubEnvironment.Address); devices on the tailnet reach
+	// the environment there, never through the hub.
+	PathEnvironmentAddress = "/v1/environment/address"
 	// PathHealth answers without a session, for a load balancer.
 	PathHealth = "/healthz"
 )
@@ -103,6 +109,16 @@ const (
 func EnvironmentAPI(id string) string {
 	return PathEnvironments + "/" + id + "/api"
 }
+
+// The transports a hub gives environments' devices a direct address on, rather
+// than through its own proxy. TransportCloudflare is a Cloudflare Tunnel on a
+// hostname in the hub's zone, reachable from the internet; TransportTailscale
+// is the environment's own node in the hub's tailnet, reachable only by the
+// tailnet's devices.
+const (
+	TransportCloudflare = "cloudflare"
+	TransportTailscale  = "tailscale"
+)
 
 // EnvironmentTunnelOrigin is where the tunnel a hub makes for an environment
 // reaches the environment's daemon, on the loopback address of the machine

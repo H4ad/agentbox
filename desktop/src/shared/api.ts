@@ -2112,6 +2112,8 @@ export interface HubEnvironment {
   version?: string;
   hostname?: string;
   createdAt: string;
+  transport?: string;
+  address?: string;
 }
 
 export interface HubCreateEnvironmentRequest {
@@ -2181,6 +2183,8 @@ export interface LANTunnel {
   named: boolean;
   hostname?: string;
   namedHostname?: string;
+  transport?: string;
+  tailnet?: string;
   state: string;
   url?: string;
   error?: string;
