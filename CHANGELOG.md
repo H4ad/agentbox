@@ -3,6 +3,30 @@
 All notable, user-facing changes to AgentBox are documented here, in the style of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Nothing older than 0.3.0 is listed.
 
+## [0.17.0](https://github.com/leciric/agentbox/compare/v0.16.0...v0.17.0) (2026-10-27)
+
+
+### Added
+
+* agentbox vm init boots a ready-made VM disk, so its first boot no longer installs Incus ([#539](https://github.com/leciric/agentbox/issues/539)) ([81ce8d4](https://github.com/leciric/agentbox/commit/81ce8d4c1a65bbe11e4d169acca36e7289d21894))
+* agents a project's chat creates run the chat's own AI tool and account, falling back to Claude Code when agents can't run it ([#533](https://github.com/leciric/agentbox/issues/533)) ([2d5bcce](https://github.com/leciric/agentbox/commit/2d5bcce139cba84b3b6e3d62caec2df886ba71b5))
+* an agent's panel in UI v2 has one switch of all its views, like the lead's, with Android for Android projects ([#541](https://github.com/leciric/agentbox/issues/541)) ([0dc116d](https://github.com/leciric/agentbox/commit/0dc116d1e1cce3bb65d97f19c24e64c72df2f669))
+* anonymous usage stats say which first-run Setup steps a new installation reaches, how long each took and why one failed ([#535](https://github.com/leciric/agentbox/issues/535)) ([413d838](https://github.com/leciric/agentbox/commit/413d83820f90000dde047e72064617191f6f9723))
+* chat pages take the app's theme live, open their links, say what failed, and open beside the chat with zoom ([#544](https://github.com/leciric/agentbox/issues/544)) ([4968fb4](https://github.com/leciric/agentbox/commit/4968fb47ab905eda0af62c773ef6c97bd941224b))
+* connect to a hub without a password, and run one with npx agentbox-hub ([#545](https://github.com/leciric/agentbox/issues/545)) ([b5fd01a](https://github.com/leciric/agentbox/commit/b5fd01a673ebb95598be4996bcecd5e95932d0d0))
+* Setup downloads the base image in the background, and agents created meanwhile wait for it and start by themselves ([#536](https://github.com/leciric/agentbox/issues/536)) ([7b2fe2c](https://github.com/leciric/agentbox/commit/7b2fe2cf1758e9d275260a25d8eea86a85a7464c))
+* Setup gives your user /dev/kvm with one password prompt, a Mac no longer needs Homebrew's Lima, and an install script checks Linux first ([#538](https://github.com/leciric/agentbox/issues/538)) ([3018545](https://github.com/leciric/agentbox/commit/301854571773c3e3ead279ac3279b3984e24a5ee))
+* the hub ships from this repository (npx agentbox-hub, MIT), and a hub on Tailscale puts your machines in your tailnet ([#547](https://github.com/leciric/agentbox/issues/547)) ([2785feb](https://github.com/leciric/agentbox/commit/2785feb8aa8c3ffa71f01d8d0381b7dee930e3ce))
+* the Week page shows what the week cost at API prices, estimated from list prices for Codex and Cursor ([#542](https://github.com/leciric/agentbox/issues/542)) ([32b68ca](https://github.com/leciric/agentbox/commit/32b68caf383c67fbbad7f528f7b619e79c0634c4))
+
+
+### Fixed
+
+* importing cookies on Windows finds Firefox and explains how to import Chrome and Edge from an export file ([#537](https://github.com/leciric/agentbox/issues/537)) ([700607e](https://github.com/leciric/agentbox/commit/700607e2c9a9be22b7448dd987db13a2de2136e5))
+* installs on the nightly channel stay on it after updating to a stable release ([#546](https://github.com/leciric/agentbox/issues/546)) ([8f1c3d6](https://github.com/leciric/agentbox/commit/8f1c3d6dc408d2446eae97d2c36f817e2f667c4b))
+* the agents' base image downloads 60% smaller, several parts at once, resumable, from the CDN first ([#543](https://github.com/leciric/agentbox/issues/543)) ([090b599](https://github.com/leciric/agentbox/commit/090b5997390c5d2b58c59417f96183085de9b4f6))
+* the VM popover on Windows no longer shows a WSL timeout error while AgentBox is busy ([#532](https://github.com/leciric/agentbox/issues/532)) ([4ea526b](https://github.com/leciric/agentbox/commit/4ea526b2e264fc7914273701817e71910cff89c3))
+
 ## [0.16.0](https://github.com/leciric/agentbox/compare/v0.15.0...v0.16.0) (2026-10-26)
 
 
